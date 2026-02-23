@@ -897,28 +897,45 @@
                 <!-- Text Card -->
                 <div
                   v-if="item.type === 'text'"
-                  class="p-6 border border-border bg-panel shadow-sm hover:shadow-md transition-all duration-300 rounded-xl"
+                  @click="toggleTextExpand(item.id)"
+                  class="relative border border-border bg-panel shadow-sm hover:shadow-md transition-all duration-500 rounded-xl overflow-hidden cursor-pointer group/text"
+                  :class="expandedTextItems[item.id] ? 'h-auto' : 'max-h-[200px]'"
                 >
-                  <p
-                    class="font-serif text-[13px] leading-7 text-black whitespace-pre-wrap tracking-wide"
-                  >
-                    {{ item.content }}
-                  </p>
-                  <div
-                    class="mt-4 flex justify-between items-center pt-3 border-t border-border/50"
-                  >
-                    <div class="flex flex-wrap gap-1.5 max-w-[70%]">
-                      <span
-                        v-for="tag in getTags(item)"
-                        :key="tag"
-                        @click.stop="selectTag(tag)"
-                        class="text-[9px] tracking-widest text-sub uppercase cursor-pointer tag-link"
-                        >#{{ tag }}</span
+                  <div class="p-6">
+                    <!-- 内容区域 -->
+                    <p
+                      class="font-serif text-[13px] leading-7 text-black whitespace-pre-wrap tracking-wide transition-all duration-500"
+                    >
+                      {{ item.content }}
+                    </p>
+
+                    <!-- 底部信息栏 (标签和日期) -->
+                    <div
+                      class="mt-4 flex justify-between items-center pt-3 border-t border-border/50"
+                      :class="{ 'opacity-100': expandedTextItems[item.id], 'opacity-50': !expandedTextItems[item.id] }"
+                    >
+                      <div class="flex flex-wrap gap-1.5 max-w-[70%]">
+                        <span
+                          v-for="tag in getTags(item)"
+                          :key="tag"
+                          @click.stop="selectTag(tag)"
+                          class="text-[9px] tracking-widest text-sub uppercase cursor-pointer tag-link"
+                          >#{{ tag }}</span
+                        >
+                      </div>
+                      <span class="text-[9px] text-sub font-sans"
+                        >{{ formatDate(item.created_at) }}</span
                       >
                     </div>
-                    <span class="text-[9px] text-sub font-sans"
-                      >{{ formatDate(item.created_at) }}</span
-                    >
+                  </div>
+
+                  <!-- 渐变遮罩 (仅在未展开时显示) -->
+                  <div
+                    v-if="!expandedTextItems[item.id]"
+                    class="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-panel via-panel/80 to-transparent pointer-events-none flex items-end justify-center pb-2"
+                  >
+                    <!-- 一个小箭头提示 -->
+                    <span class="text-black/30 text-xs animate-bounce">↓</span>
                   </div>
                 </div>
 
@@ -1278,79 +1295,279 @@
         <!-- 导出模态框 -->
         <div
           v-if="showExport"
-          class="fixed inset-0 z-[100] flex items-center justify-center p-4 fullscreen-layer"
+          class="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-6 fullscreen-layer"
         >
+          <!-- 背景遮罩 -->
           <div
             @click="closeExport"
-            class="absolute inset-0 bg-white/90 backdrop-blur-md transition-all"
+            class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-all"
           ></div>
+
+          <!-- 主弹窗容器：移动端全屏 Flex，禁止整体滚动 -->
           <div
-            class="bg-white w-full max-w-5xl shadow-2xl relative z-10 animate-slide-up flex flex-col md:flex-row max-h-[90vh] overflow-hidden border border-gray-100"
+            class="bg-white w-full h-full md:h-[90vh] md:max-w-5xl md:rounded-2xl shadow-2xl relative z-10 animate-slide-up flex flex-col md:flex-row overflow-hidden"
           >
+            <!-- =========================
+                 1. 预览区 (Preview) - 修改版：支持缩放
+            ========================== -->
             <div
-              class="flex-1 bg-[#F5F5F5] p-4 md:p-10 flex items-center justify-center overflow-auto relative"
+              class="relative bg-[#E5E7EB] md:bg-[#F0F2F5] flex-col items-center justify-start h-[45vh] md:h-auto md:flex-1 shrink-0 order-1 md:order-1 border-b md:border-b-0 md:border-r border-gray-200 group/preview"
             >
-              <canvas
-                ref="quoteCanvas"
-                class="block w-auto h-auto max-w-full shadow-xl"
-                style="max-height: none"
-              ></canvas>
+              <!-- 核心修复：绝对定位撑满区域 -->
+              <div
+                class="absolute inset-0 overflow-auto p-4 md:p-10 custom-scrollbar flex flex-col items-center"
+              >
+                <!-- 
+                  修改点：
+                  1. 移除 max-w-full h-auto，防止被强制压缩
+                  2. 增加 style 绑定，通过 previewScale 控制显示宽度
+                -->
+                <canvas
+                  ref="quoteCanvas"
+                  class="block shadow-2xl bg-white transition-all duration-200 origin-top"
+                  :style="{
+                    width: previewScale + '%',
+                    height: 'auto'
+                  }"
+                  @click.stop
+                ></canvas>
+
+                <!-- 底部垫片，防止长图底部被遮挡 -->
+                <div class="h-20 shrink-0 w-full"></div>
+              </div>
+
+              <!-- 新增：缩放控制滑块 (悬浮在底部中间) -->
+              <div
+                class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur text-white px-4 py-2 rounded-full flex items-center gap-3 shadow-xl opacity-0 group-hover/preview:opacity-100 transition-opacity z-30"
+              >
+                <span
+                  class="text-[9px] font-bold tracking-widest cursor-pointer hover:text-gray-300"
+                  @click="previewScale = Math.max(10, previewScale - 10)"
+                  >-</span
+                >
+                <input
+                  type="range"
+                  v-model="previewScale"
+                  min="10"
+                  max="150"
+                  step="5"
+                  class="w-24 h-1 bg-gray-500 rounded-lg appearance-none cursor-pointer accent-white"
+                />
+                <span
+                  class="text-[9px] font-bold tracking-widest cursor-pointer hover:text-gray-300"
+                  @click="previewScale = Math.min(150, previewScale + 10)"
+                  >+</span
+                >
+                <span class="text-[9px] w-8 text-right font-mono"
+                  >{{ previewScale }}%</span
+                >
+
+                <!-- 重置按钮 -->
+                <button
+                  @click="previewScale = 60"
+                  class="ml-2 text-[9px] border border-white/30 px-1.5 rounded hover:bg-white hover:text-black transition-colors"
+                  title="重置缩放"
+                >
+                  R
+                </button>
+              </div>
+
+              <!-- 移动端关闭按钮 (浮动在右上角) -->
+              <button
+                @click="closeExport"
+                class="absolute top-4 right-4 md:hidden w-8 h-8 bg-black/40 text-white rounded-full flex items-center justify-center backdrop-blur-md z-20 hover:bg-black/60 active:scale-95"
+              >
+                &times;
+              </button>
             </div>
 
+            <!-- =========================
+                 2. 操作区 (Controls)
+                 占据剩余高度，内部独立滚动
+            ========================== -->
             <div
-              class="w-full md:w-80 bg-white border-l border-gray-100 flex flex-col shrink-0"
+              class="bg-white w-full md:w-96 flex flex-col order-2 md:order-2 flex-1 md:flex-none h-[55vh] md:h-auto"
             >
+              <!-- 标题栏 (PC显示) -->
               <div
-                class="p-6 border-b border-gray-50 flex justify-between items-center"
+                class="hidden md:flex p-5 border-b border-gray-100 justify-between items-center bg-white sticky top-0 z-10"
               >
-                <span class="text-xs font-bold tracking-widest">书摘制作</span>
+                <span class="text-xs font-bold tracking-widest uppercase"
+                  >Export Settings</span
+                >
                 <button
                   @click="closeExport"
-                  class="text-lg hover:text-red-500 transition-colors"
+                  class="text-lg w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
                   &times;
                 </button>
               </div>
-              <div class="p-6 flex-1 overflow-y-auto space-y-8">
+
+              <!-- 滚动操作区 -->
+              <div
+                class="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-8"
+              >
+                <!-- A. 风格选择 -->
                 <div>
-                  <p
-                    class="text-[10px] text-gray-400 tracking-widest mb-4 uppercase"
-                  >
-                    选择风格
-                  </p>
-                  <div class="grid grid-cols-4 gap-4">
+                  <div class="flex justify-between items-center mb-3">
+                    <p
+                      class="text-[10px] text-gray-400 tracking-widest uppercase font-bold"
+                    >
+                      STYLE
+                    </p>
+                    <span
+                      class="text-[10px] font-serif italic text-black bg-gray-100 px-2 py-0.5 rounded"
+                      >{{ styles[exportStyle].name }}</span
+                    >
+                  </div>
+                  <div class="grid grid-cols-6 gap-3">
                     <button
                       v-for="(s, k) in styles"
                       :key="k"
                       @click="changeExportStyle(k)"
-                      class="style-btn w-10 h-10 rounded-full border border-gray-200 shadow-sm"
+                      class="style-btn w-9 h-9 rounded-full border border-gray-200 shadow-sm transition-transform active:scale-95"
                       :class="{active: exportStyle === k}"
                       :style="{background: s.btnColor}"
                       :title="s.name"
                     ></button>
                   </div>
-                  <p class="text-center text-xs font-serif mt-3 text-gray-500">
-                    {{ styles[exportStyle].name }}
-                  </p>
                 </div>
+
+                <!-- B. 排版控制 -->
                 <div>
                   <p
-                    class="text-[10px] text-gray-400 tracking-widest mb-4 uppercase"
+                    class="text-[10px] text-gray-400 tracking-widest mb-3 uppercase font-bold"
                   >
-                    操作
+                    TYPOGRAPHY
                   </p>
-                  <div class="space-y-3">
-                    <button
-                      @click="downloadAsImage"
-                      class="w-full py-3 bg-black text-white text-[10px] tracking-[0.2em] hover:bg-gray-800 transition-colors"
-                    >
-                      保存图片
-                    </button>
+                  <div
+                    class="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-100"
+                  >
+                    <!-- 字体选择 -->
+                    <div class="space-y-1.5">
+                      <label class="text-[9px] text-gray-500 font-bold"
+                        >FONT</label
+                      >
+                      <div class="relative">
+                        <select
+                          v-model="exportSettings.fontFamily"
+                          @change="drawCard"
+                          class="w-full appearance-none bg-white border border-gray-200 text-[11px] py-2 px-3 rounded focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all"
+                        >
+                          <option value="default">默认 (Default)</option>
+                          <option
+                            v-for="font in fontList"
+                            :key="font.id"
+                            :value="font.id"
+                          >
+                            {{ font.content || '未命名字体' }}
+                          </option>
+                        </select>
+                        <div
+                          class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500"
+                        >
+                          <svg
+                            class="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M19 9l-7 7-7-7"
+                            ></path>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 对齐方式 -->
+                    <div class="space-y-1.5">
+                      <label class="text-[9px] text-gray-500 font-bold"
+                        >ALIGN</label
+                      >
+                      <div
+                        class="flex bg-white rounded border border-gray-200 p-0.5"
+                      >
+                        <button
+                          v-for="align in ['left', 'center', 'right']"
+                          :key="align"
+                          @click="exportSettings.textAlign = align; drawCard()"
+                          class="flex-1 py-1.5 text-[10px] rounded transition-colors capitalize"
+                          :class="exportSettings.textAlign === align ? 'bg-black text-white shadow-sm' : 'text-gray-400 hover:text-black'"
+                        >
+                          {{ align }}
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- 字体大小滑块 -->
+                    <div class="space-y-2 pt-1">
+                      <div class="flex justify-between items-center">
+                        <label class="text-[9px] text-gray-500 font-bold"
+                          >SIZE</label
+                        >
+                        <span
+                          class="text-[9px] font-mono bg-white px-1.5 rounded border border-gray-100"
+                          >{{ exportSettings.fontSize }}px</span
+                        >
+                      </div>
+                      <input
+                        type="range"
+                        v-model="exportSettings.fontSize"
+                        @input="drawCard"
+                        min="20"
+                        max="80"
+                        step="2"
+                        class="w-full accent-black h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+
+                    <!-- 行高滑块 -->
+                    <div class="space-y-2 pt-1">
+                      <div class="flex justify-between items-center">
+                        <label class="text-[9px] text-gray-500 font-bold"
+                          >LINE HEIGHT</label
+                        >
+                        <span
+                          class="text-[9px] font-mono bg-white px-1.5 rounded border border-gray-100"
+                          >{{ exportSettings.lineHeight }}px</span
+                        >
+                      </div>
+                      <input
+                        type="range"
+                        v-model="exportSettings.lineHeight"
+                        @input="drawCard"
+                        min="30"
+                        max="150"
+                        step="2"
+                        class="w-full accent-black h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- C. 动作按钮 (底部留白防止由于安全区遮挡) -->
+                <div class="pb-10">
+                  <p
+                    class="text-[10px] text-gray-400 tracking-widest mb-3 uppercase font-bold"
+                  >
+                    ACTIONS
+                  </p>
+                  <div class="grid grid-cols-2 gap-3">
                     <button
                       @click="downloadAsText"
-                      class="w-full py-3 border border-gray-200 text-black text-[10px] tracking-[0.2em] hover:bg-gray-50 transition-colors"
+                      class="py-3 border border-gray-200 text-black text-[10px] font-bold tracking-widest rounded-lg hover:bg-gray-50 active:scale-95 transition-all"
                     >
-                      仅复制文本
+                      COPY TEXT
+                    </button>
+                    <button
+                      @click="downloadAsImage"
+                      class="py-3 bg-black text-white text-[10px] font-bold tracking-widest rounded-lg shadow-lg hover:bg-gray-800 active:scale-95 transition-all"
+                    >
+                      SAVE IMAGE
                     </button>
                   </div>
                 </div>
@@ -2011,7 +2228,7 @@
     </div>
 
     <script>
-      const { createApp, ref, computed, onMounted, nextTick } = Vue;
+      const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
 
       createApp({
         setup() {
@@ -2104,6 +2321,18 @@
           const showExport = ref(false);
           const exportItem = ref(null);
           const exportStyle = ref("classic");
+          // === 新增：书摘排版设置 ===
+          const exportSettings = ref({
+            fontSize: 36,
+            lineHeight: 68,
+            textAlign: "left", // left, center, right
+            fontFamily: "default", // 默认跟随主题，或者使用自定义字体的 ID
+          });
+          const previewScale = ref(60);
+          // === 新增：获取上传的字体列表供书摘选择 ===
+          const fontList = computed(() => {
+            return items.value.filter((i) => i.type === "font");
+          });
           const quoteCanvas = ref(null);
           const loading = ref(false);
           const uploading = ref(false);
@@ -2115,7 +2344,12 @@
           const toggleFlip = (id) => {
             flippedCards.value[id] = !flippedCards.value[id];
           };
-          // ========================
+          // === 请添加下面这段代码 ===
+          const expandedTextItems = ref({}); // 存储文字卡片的展开状态
+          const toggleTextExpand = (id) => {
+            expandedTextItems.value[id] = !expandedTextItems.value[id];
+          };
+          // =========================
           // === 新增：角色卡历史记录模态框状态 ===
           const showHistoryModal = ref(false);
           const currentHistoryItem = ref(null);
@@ -2817,9 +3051,32 @@
             }
           };
 
-          const wrapText = (ctx, text, x, y, maxWidth, lineHeight) => {
+          // === 【修改代码】支持左中右对齐的文字换行函数 ===
+          const wrapText = (
+            ctx,
+            text,
+            x,
+            y,
+            maxWidth,
+            lineHeight,
+            align = "left",
+          ) => {
             const paragraphs = text.split("\n");
             let currentY = y;
+
+            // 根据对齐方式计算每一行的起始 X 坐标
+            let drawX = x;
+            if (align === "center") {
+              ctx.textAlign = "center";
+              drawX = x + maxWidth / 2;
+            } else if (align === "right") {
+              ctx.textAlign = "right";
+              drawX = x + maxWidth;
+            } else {
+              ctx.textAlign = "left";
+              drawX = x;
+            }
+
             paragraphs.forEach((paragraph) => {
               const words = paragraph.split("");
               let line = "";
@@ -2827,18 +3084,19 @@
                 const testLine = line + words[n];
                 const metrics = ctx.measureText(testLine);
                 if (metrics.width > maxWidth && n > 0) {
-                  ctx.fillText(line, x, currentY);
+                  ctx.fillText(line, drawX, currentY);
                   line = words[n];
                   currentY += lineHeight;
                 } else {
                   line = testLine;
                 }
               }
-              ctx.fillText(line, x, currentY);
-              currentY += lineHeight * 1.5;
+              ctx.fillText(line, drawX, currentY);
+              currentY += lineHeight * 1.5; // 段落间距
             });
             return currentY;
           };
+
           // --- 新增：画圆角矩形的工具函数 ---
           const roundRect = (ctx, x, y, w, h, r) => {
             if (w < 2 * r) r = w / 2;
@@ -2851,6 +3109,7 @@
             ctx.arcTo(x, y, x + w, y, r);
             ctx.closePath();
           };
+          // === 【修改代码】绘制卡片函数 ===
           const drawCard = () => {
             const cvs = quoteCanvas.value;
             if (!cvs || !exportItem.value) return;
@@ -2859,7 +3118,18 @@
             const text = exportItem.value.content || "";
             const date = formatDate(exportItem.value.created_at);
 
-            // === 1. 基础配置与参数计算 ===
+            // 1. 读取设置 (防止报错，加了 ?. 保护)
+            const settings = exportSettings.value || {
+              fontSize: 36,
+              lineHeight: 68,
+              textAlign: "left",
+              fontFamily: "default",
+            };
+            const fontSize = Number(settings.fontSize);
+            const lineHeight = Number(settings.lineHeight);
+            const align = settings.textAlign;
+
+            // 2. 基础布局参数
             const W = 900;
             let paddingX = 80;
             let paddingTop = 80;
@@ -2888,67 +3158,96 @@
               paddingX = 100;
               paddingTop = 120;
             }
-            // 弥散风格上下留白稍微多一点，更有呼吸感
             if (s.type === "diffusion") {
               paddingX = 90;
               paddingTop = 150;
               paddingBottom = 150;
             }
 
-            const fontSize = 36;
-            const lineHeight = 68;
-
-            // 设置字体
+            // 3. 确定字体
             let fontName = '"Noto Serif SC"';
             if (s.font === "sans")
               fontName = '"Inter", "PingFang SC", sans-serif';
             if (s.font === "mono") fontName = '"Menlo", "Consolas", monospace';
 
-            // 设置字体样式
-            ctx.font = `300 ${fontSize}px ${fontName}`;
-            if (s.type === "zen_editor")
-              ctx.font = `400 ${fontSize}px ${fontName}`;
-            // 弥散背景深，字稍微粗一点点保证清晰，但不要太粗
-            if (s.type === "diffusion")
-              ctx.font = `400 ${fontSize}px ${fontName}`;
-            if (s.type === "receipt") ctx.font = `400 32px ${fontName}`;
+            // 如果用户选择了自定义字体
+            if (settings.fontFamily !== "default") {
+              // 这里的 'font_ID' 必须和之前加载字体时的名称一致
+              fontName = `'font_${settings.fontFamily}', sans-serif`;
+            }
 
-            // 计算文本换行和高度
-            const paragraphs = text.split("\n");
-            let lineCount = 0;
+            // 4. 计算高度 (Measure)
+            // 临时设置字体用于计算
+            let fontWeight = "300";
+            if (
+              s.type === "zen_editor" ||
+              s.type === "diffusion" ||
+              s.type === "receipt"
+            )
+              fontWeight = "400";
+            if (settings.fontFamily !== "default") fontWeight = "normal"; // 自定义字体通常不用300
+
+            ctx.font = `${fontWeight} ${fontSize}px ${fontName}`;
+
             let textWidthLimit = W - paddingX * 2;
             if (s.type === "receipt") textWidthLimit = 560;
 
-            paragraphs.forEach((p) => {
-              let width = 0;
-              lineCount++;
-              for (let char of p) {
-                width += ctx.measureText(char).width;
-                if (width > textWidthLimit) {
-                  lineCount++;
-                  width = 0;
+            // 模拟计算高度（注意这里也传入了 align 参数，虽然计算高度不需要它，但保持参数一致）
+            const measureWrapTextHeight = (
+              ctx,
+              text,
+              x,
+              y,
+              maxWidth,
+              lineHeight,
+            ) => {
+              const paragraphs = text.split("\n");
+              let currentY = y;
+              paragraphs.forEach((paragraph) => {
+                const words = paragraph.split("");
+                let line = "";
+                for (let n = 0; n < words.length; n++) {
+                  const testLine = line + words[n];
+                  const metrics = ctx.measureText(testLine);
+                  if (metrics.width > maxWidth && n > 0) {
+                    line = words[n];
+                    currentY += lineHeight;
+                  } else {
+                    line = testLine;
+                  }
                 }
-              }
-            });
+                currentY += lineHeight * 1.5;
+              });
+              return currentY;
+            };
 
-            const textHeight =
-              lineCount * lineHeight + paragraphs.length * (lineHeight * 0.4);
-            let H = Math.max(textHeight + paddingTop + paddingBottom + 40, 600);
-            if (s.type === "receipt")
-              H = textHeight + paddingTop + paddingBottom + 100;
+            const textEndY = measureWrapTextHeight(
+              ctx,
+              text,
+              paddingX,
+              paddingTop,
+              textWidthLimit,
+              lineHeight,
+            );
+            let H = textEndY + paddingBottom + 60;
+            if (s.type === "cute_console") H = textEndY + 300;
+            if (s.type === "receipt") H = textEndY + 200;
+            H = Math.max(H, 600);
 
-            // === 2. 绘制背景与容器 ===
+            // 5. 绘制背景 (保持原有逻辑)
             cvs.width = W;
             cvs.height = H;
             ctx.fillStyle = s.bg;
             ctx.fillRect(0, 0, W, H);
 
+            // ... (此处省略背景装饰绘制代码，如 dream_os, cute_console 等，保持您原来的即可) ...
+            // 为了代码简洁，请把原来 drawCard 中间绘制装饰的那一大段 IF/ELSE 复制回来放在这里
+            // ===========================================
             // ------ A. 🌸 浮光 Dream OS ------
             if (s.type === "dream_os") {
               const winMargin = 40;
               const winW = W - winMargin * 2;
               const winH = H - winMargin * 2;
-
               ctx.shadowColor = "rgba(0,0,0,0.05)";
               ctx.shadowBlur = 30;
               ctx.shadowOffsetY = 15;
@@ -2956,7 +3255,6 @@
               roundRect(ctx, winMargin, winMargin, winW, winH, 24);
               ctx.fill();
               ctx.shadowColor = "transparent";
-
               const grad = ctx.createLinearGradient(
                 winMargin,
                 winMargin,
@@ -2971,7 +3269,6 @@
               ctx.fillStyle = grad;
               ctx.fillRect(winMargin, winMargin, winW, 60);
               ctx.restore();
-
               ctx.fillStyle = "#EDA6A6";
               ctx.beginPath();
               ctx.arc(winMargin + 40, winMargin + 30, 8, 0, Math.PI * 2);
@@ -2991,7 +3288,6 @@
               ctx.lineTo(winMargin + winW, winMargin + 60);
               ctx.stroke();
             }
-
             // ------ B. 🎮 玩伴 Cute Console ------
             if (s.type === "cute_console") {
               const screenMargin = 50;
@@ -3010,7 +3306,6 @@
               );
               ctx.fill();
               ctx.shadowColor = "transparent";
-
               ctx.strokeStyle = "#DDE4E2";
               ctx.lineWidth = 2;
               roundRect(
@@ -3022,7 +3317,6 @@
                 20,
               );
               ctx.stroke();
-
               const controlsY = H - 120;
               ctx.fillStyle = "#A3B8B2";
               const dpadSize = 25;
@@ -3055,7 +3349,6 @@
               ctx.arc(W - 180, btnY + 10, 24, 0, Math.PI * 2);
               ctx.fill();
             }
-
             // ------ C. 🌙 禅意 Zen Editor ------
             if (s.type === "zen_editor") {
               ctx.fillStyle = "#242933";
@@ -3076,13 +3369,15 @@
               ctx.fillStyle = "#3B4252";
               ctx.fillRect(0, 60, 60, H - 60);
               ctx.fillStyle = "#4C566A";
+              // 行号
               ctx.font = `18px ${fontName}`;
               ctx.textAlign = "right";
-              for (let i = 1; i < 15; i++) {
+              // 动态计算大概多少行
+              const approxLines = Math.floor((H - 100) / lineHeight);
+              for (let i = 1; i < approxLines + 5; i++) {
                 ctx.fillText(i, 45, 100 + (i - 1) * lineHeight);
               }
             }
-
             // ------ D. 🧾 存根 Receipt ------
             if (s.type === "receipt") {
               const ticketW = 700;
@@ -3124,7 +3419,6 @@
               ctx.textAlign = "center";
               ctx.fillText("MUSEUM OF THOUGHTS", W / 2, 60);
             }
-
             // ------ E. 🧧 信笺 Letter ------
             if (s.type === "letter") {
               ctx.strokeStyle = "rgba(200, 100, 100, 0.15)";
@@ -3145,86 +3439,71 @@
               ctx.lineTo(endX, 80);
               ctx.stroke();
             }
-
-            // ------ F. 🫧 弥散 Diffusion (完全重制版) ------
+            // ------ F. 🫧 弥散 Diffusion ------
             if (s.type === "diffusion") {
-              // 1. 背景：使用深空灰/午夜蓝，替代死黑
               ctx.fillStyle = "#1C1C1E";
               ctx.fillRect(0, 0, W, H);
-
-              // 2. 渐变：低饱和度、大半径、柔和过渡
-              // 左上：雾霾蓝/灰蓝
               let g1 = ctx.createRadialGradient(0, 0, 0, W / 1.2, H / 1.2, W);
               g1.addColorStop(0, "rgba(94, 114, 128, 0.4)");
               g1.addColorStop(1, "transparent");
               ctx.fillStyle = g1;
               ctx.fillRect(0, 0, W, H);
-
-              // 右下：干枯玫瑰/暖灰
               let g2 = ctx.createRadialGradient(W, H, 0, W / 1.2, H / 1.2, W);
               g2.addColorStop(0, "rgba(156, 136, 136, 0.35)");
               g2.addColorStop(1, "transparent");
               ctx.fillStyle = g2;
               ctx.fillRect(0, 0, W, H);
-
-              // 3. 噪点纹理：模拟胶片颗粒感 (提升高级感关键)
               ctx.save();
               ctx.fillStyle = "rgba(255,255,255,0.03)";
-              // 随机画一些微小的点，不用太多
               for (let i = 0; i < 600; i++) {
                 const nx = Math.random() * W;
                 const ny = Math.random() * H;
                 ctx.fillRect(nx, ny, 2, 2);
               }
               ctx.restore();
-
-              // 4. 容器：去掉描边，改用极淡的玻璃反光
               ctx.fillStyle = "rgba(255, 255, 255, 0.02)";
               const cardM = 40;
               roundRect(ctx, cardM, cardM, W - cardM * 2, H - cardM * 2, 24);
               ctx.fill();
-
-              // 5. 装饰：极简播放器进度条模拟
               const barY = H - cardM - 70;
               ctx.fillStyle = "rgba(255,255,255,0.15)";
-              // 进度条槽
               roundRect(ctx, cardM + 50, barY, 100, 4, 2);
               ctx.fill();
-              // 进度点
               ctx.fillStyle = "rgba(255,255,255,0.5)";
               roundRect(ctx, cardM + 50, barY, 40, 4, 2);
               ctx.fill();
             }
+            // ===========================================
 
-            // === 3. 绘制文字内容 ===
+            // 6. 绘制文字 (核心修改处)
             ctx.fillStyle = s.text;
             ctx.textBaseline = "top";
-            ctx.textAlign = "left";
 
-            // 恢复正文字体
-            ctx.font = `300 ${fontSize}px ${fontName}`;
-            if (s.type === "zen_editor")
-              ctx.font = `400 ${fontSize}px ${fontName}`;
-            if (s.type === "diffusion")
-              ctx.font = `400 ${fontSize}px ${fontName}`; // 弥散不需要太粗了
-            if (s.type === "receipt") ctx.font = `400 32px ${fontName}`;
-
+            // 重新设置字体 (上面 IF/ELSE 里可能改了)
+            ctx.font = `${fontWeight} ${fontSize}px ${fontName}`;
             ctx.letterSpacing = s.letter ? "2px" : "0px";
 
             let drawX = paddingX;
             let drawY = paddingTop;
             if (s.type === "receipt") drawX = (W - 560) / 2;
 
-            wrapText(ctx, text, drawX, drawY, textWidthLimit, lineHeight);
+            // 使用新的 wrapText 并传入 align
+            wrapText(
+              ctx,
+              text,
+              drawX,
+              drawY,
+              textWidthLimit,
+              lineHeight,
+              align,
+            );
 
-            // === 4. 绘制底部信息 ===
+            // 7. 绘制底部信息
             const footerY = H - paddingBottom + 50;
-
-            // 日期
             ctx.font = `400 22px ${fontName}`;
             ctx.fillStyle = s.sub;
             ctx.textAlign = "left";
-            if (s.type === "diffusion") ctx.fillStyle = "rgba(255,255,255,0.5)"; // 日期也柔和一点
+            if (s.type === "diffusion") ctx.fillStyle = "rgba(255,255,255,0.5)";
 
             let footerX = paddingX;
             let realFooterY = footerY;
@@ -3239,14 +3518,12 @@
               dateStr = date + " " + new Date().toLocaleTimeString();
               ctx.font = `400 20px "Courier New"`;
             }
-            // 弥散风格日期位置微调
             if (s.type === "diffusion") realFooterY = H - paddingBottom + 30;
 
             ctx.fillText(dateStr, footerX, realFooterY);
 
-            // Logo / 签名 / 装饰
+            // Logo / 签名
             ctx.textAlign = "right";
-
             if (s.type === "dream_os") {
               ctx.font = `300 22px sans-serif`;
               ctx.fillStyle = "#D0C0C0";
@@ -3257,18 +3534,13 @@
               ctx.fillText("MUSEUM", W - paddingX, realFooterY);
             } else if (s.type === "zen_editor") {
               ctx.fillStyle = "#81A1C1";
-              ctx.fillText(
-                "Ln " + lineCount + ", Col 1  UTF-8",
-                W - 40,
-                H - 20,
-              );
+              ctx.fillText("UTF-8", W - 40, H - 20);
             } else if (s.type === "receipt") {
               const barX = W - footerX - 150;
               const barY = H - 135;
               ctx.fillStyle = "#000";
               for (let i = 0; i < 30; i++) {
                 const w = Math.random() > 0.5 ? 2 : 5;
-                const gap = Math.random() * 5 + 2;
                 ctx.fillRect(barX + i * 5, barY, w, 40);
               }
               ctx.font = "16px Courier New";
@@ -3303,6 +3575,7 @@
               ctx.fillText("博物馆 | MUSEUM", W - paddingX, realFooterY);
             }
           };
+
           const getRoleCardData = (item) => {
             if (!item || !item.content)
               return { name: "未命名", description: "", history: [] };
@@ -3394,6 +3667,7 @@
               exportItem.value = item;
               exportStyle.value = "classic";
               showExport.value = true;
+              previewScale.value = window.innerWidth < 768 ? 90 : 50;
               nextTick(() => drawCard());
             } else if (item.type === "link") {
               downloadString(
@@ -4159,6 +4433,18 @@
               uploading.value = false;
             }
           };
+          // === 【新增】自动监听设置变化，实现实时预览 ===
+          watch(
+            exportSettings,
+            () => {
+              // 只要 exportSettings 里有任何变动，就重绘
+              // 使用 requestAnimationFrame 避免拖动太快时卡顿
+              requestAnimationFrame(() => {
+                drawCard();
+              });
+            },
+            { deep: true }, // 深度监听：监听对象内部的属性变化
+          );
 
           return {
             config,
@@ -4249,9 +4535,14 @@
             openHistoryModal,
             toggleFlip, // <--- 新增
             flippedCards, // <--- 新增
+            expandedTextItems,
+            toggleTextExpand,
             showTagList,
             tagSuggestions,
             applyTagSuggestion,
+            exportSettings,
+            fontList,
+            previewScale,
           };
         },
       }).mount("#app");
