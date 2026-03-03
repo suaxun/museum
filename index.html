@@ -653,7 +653,16 @@
                   ></span>
                 </button>
               </template>
-              <!-- ...其他按钮保持不变... -->
+              <div
+                v-if="session"
+                class="hidden md:flex items-center gap-1 text-[9px] text-gray-400 tracking-wider shrink-0 cursor-help"
+                :title="'Supabase 保活运行中\n最后通讯: ' + lastPingTime"
+              >
+                <div
+                  class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_5px_#22c55e]"
+                ></div>
+                <span>KEEP ALIVE</span>
+              </div>
               <button
                 @click="handleLogout"
                 class="text-[10px] text-gray-300 hover:text-black ml-4 shrink-0"
@@ -2338,6 +2347,8 @@
           const uploading = ref(false);
           const errorMsg = ref("");
           const editingId = ref(null);
+          const keepAliveInterval = ref(null);
+          const lastPingTime = ref("未连接");
           const currentGlobalFontId = ref(null); // 记录当前正在使用的字体ID
           // === 新增：翻转状态管理 ===
           const flippedCards = ref({}); // 存储每个卡片的翻转状态 { id: boolean }
@@ -2788,20 +2799,38 @@
             currentGlobalFontId.value = item.id;
             localStorage.setItem("museum_active_font_id", item.id);
           };
+          // === 【新增】静默保活函数 ===
+          const startKeepAlive = () => {
+            if (keepAliveInterval.value) clearInterval(keepAliveInterval.value);
+
+            // 立即执行一次记录
+            lastPingTime.value = new Date().toLocaleTimeString();
+            console.log(
+              "🟢 [Keep Alive] Supabase 守护已启动: " + lastPingTime.value,
+            );
+
+            // 设定定时器：每隔 12 小时 (1000 * 60 * 60 * 12) 触发一次最轻量的查询
+            // 你可以把标签页挂在后台，它就会自动续命
+            const TWELVE_HOURS = 1000 * 60 * 60 * 12;
+
+            keepAliveInterval.value = setInterval(async () => {
+              if (!supabase) return;
+              try {
+                // 最轻量的请求：只查 1 条 id 数据，消耗极低，但足以让 Supabase 判定为活跃
+                await supabase.from("fragments").select("id").limit(1);
+                lastPingTime.value = new Date().toLocaleTimeString();
+                console.log("🟢 [Keep Alive] Ping 成功: ", lastPingTime.value);
+              } catch (e) {
+                console.error("🔴 [Keep Alive] Ping 失败: ", e);
+              }
+            }, TWELVE_HOURS);
+          };
 
           const initSupabase = async () => {
             try {
               if (!config.value.url) return;
-
-              // 从缓存取 Key
               let k = config.value.key;
-
-              // 同样进行清洗
-              if (k) {
-                k = k.trim();
-              }
-
-              // 如果 Key 包含非法字符或者是空的，就不要初始化了，等用户手动点登录
+              if (k) k = k.trim();
               if (!k || k.length < 20) return;
 
               supabase = window.supabase.createClient(
@@ -2812,9 +2841,9 @@
               if (data.session) {
                 session.value = data.session;
                 fetchData();
+                startKeepAlive(); // <--- 【增加这一行】初始化成功后启动保活
               }
             } catch (e) {
-              // 初始化失败不弹窗，只在控制台记录，避免吓到用户
               console.log("自动登录检查失败，请手动登录", e);
             }
           };
@@ -2852,6 +2881,7 @@
               if (error) throw error;
               session.value = data.session;
               fetchData();
+              startKeepAlive();
             } catch (e) {
               console.error(e);
               errorMsg.value = "登录失败: " + e.message;
@@ -4543,6 +4573,7 @@
             exportSettings,
             fontList,
             previewScale,
+            lastPingTime,
           };
         },
       }).mount("#app");
