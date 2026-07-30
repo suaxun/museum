@@ -618,6 +618,8 @@
                 >
                   {{ currentAlbum.startsWith('.') ? currentAlbum.substring(1) :
                   currentAlbum }}
+                  
+                  <!-- 原有的解锁/锁定按钮 -->
                   <button
                     @click.stop="toggleAlbumVisibility"
                     class="ml-1 px-2 py-0.5 text-[9px] rounded border border-gray-200 hover:bg-black hover:text-white hover:border-black transition-all"
@@ -625,7 +627,17 @@
                   >
                     {{ currentAlbum.startsWith('.') ? '🔒' : '🔓' }}
                   </button>
+
+                  <!-- === 新增：删除相册按钮 === -->
+                  <button
+                    @click.stop="deleteCurrentAlbum"
+                    class="ml-1 px-2 py-0.5 text-[9px] rounded border border-red-200 text-red-500 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all"
+                    title="删除整个相册"
+                  >
+                    删除相册
+                  </button>
                 </span>
+
 
                 <!-- 标签显示 -->
                 <span
@@ -640,6 +652,31 @@
 
             <!-- 右侧导航 (保持不变) -->
             <nav class="flex items-center gap-6 overflow-x-auto no-scroll pr-4">
+            <!-- === 带按钮的搜索框 (修改版) === -->
+            <div class="relative shrink-0 flex items-center mr-4 z-50">
+              <input 
+                v-model="searchInput" 
+                @keyup.enter="triggerSearch"
+                type="text" 
+                placeholder="名称/标签/内容..." 
+                class="bg-gray-100 border border-transparent text-[10px] pl-3 pr-12 py-1.5 rounded-full w-32 md:w-40 focus:w-48 transition-all duration-300 outline-none text-black placeholder-gray-400 focus:bg-white focus:border-black/20"
+              >
+              <!-- 清除按钮 -->
+              <span 
+                v-if="searchInput || searchKeyword" 
+                @click="clearSearch" 
+                class="absolute right-7 text-gray-400 cursor-pointer text-[12px] hover:text-black px-1"
+              >&times;</span>
+              <!-- 搜索按钮：加上 type="button" 防止刷新 -->
+              <button 
+                type="button"
+                @click="triggerSearch"
+                class="absolute right-1 w-6 h-6 flex items-center justify-center text-gray-500 hover:text-black rounded-full hover:bg-gray-200 transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </button>
+            </div>
+            <!-- === 新增结束 === -->
               <template v-for="(label, key) in filterMap" :key="key">
                 <button
                   @click="setFilter(key)"
@@ -663,6 +700,15 @@
                 ></div>
                 <span>KEEP ALIVE</span>
               </div>
+              <!-- === 【新增】数据迁移按钮 === -->
+<button
+  v-if="session"
+  @click="showMigrationModal = true"
+  class="text-[10px] text-gray-300 hover:text-black ml-4 shrink-0 transition-colors border border-gray-200 px-2 py-1 rounded hover:border-black"
+>
+  数据迁移
+</button>
+<!-- === 新增结束 === -->
               <button
                 @click="handleLogout"
                 class="text-[10px] text-gray-300 hover:text-black ml-4 shrink-0"
@@ -1950,20 +1996,34 @@
                     >归档至相册</span
                   >
                 </label>
-                <input
-                  v-if="uploadForm.useAlbum"
-                  v-model="uploadForm.albumName"
-                  list="albums"
-                  placeholder="输入相册名称..."
-                  class="mt-3 w-full border-b border-gray-200 py-2 text-xs focus:border-black outline-none bg-transparent"
-                />
-                <datalist id="albums">
-                  <option
-                    v-for="a in albumList"
-                    :value="a.displayName"
-                    :key="a.realName"
-                  ></option>
-                </datalist>
+                <!-- === 修改开始：相册输入框改为带联想功能的结构 === -->
+                <div v-if="uploadForm.useAlbum" class="relative group/album-input mt-3">
+                  <input
+                    v-model="uploadForm.albumName"
+                    type="text"
+                    placeholder="输入新相册名，或从下方选择"
+                    class="w-full border-b border-gray-200 py-2 text-xs focus:border-black outline-none bg-transparent"
+                    @input="showAlbumList = true"
+                    @focus="showAlbumList = true"
+                    @blur="setTimeout(() => showAlbumList = false, 200)"
+                  />
+                  <!-- 联想菜单下拉列表 -->
+                  <div
+                    v-if="showAlbumList && albumSuggestions.length > 0"
+                    class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-100 shadow-xl max-h-40 overflow-y-auto z-50 rounded-sm"
+                  >
+                    <div
+                      v-for="album in albumSuggestions"
+                      :key="album.realName"
+                      @click="applyAlbumSuggestion(album.displayName)"
+                      class="px-4 py-2 text-[10px] text-gray-500 hover:bg-black hover:text-white cursor-pointer transition-colors border-b border-gray-50 last:border-0 flex justify-between items-center"
+                    >
+                      <span class="truncate">{{ album.displayName }}</span>
+                      <span class="text-[9px] opacity-50">{{ album.count }}张</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- === 修改结束 === -->
               </div>
 
               <!-- 类型：文字 -->
@@ -2202,7 +2262,62 @@
             </div>
           </div>
         </div>
+        <!-- === 【新增】数据迁移模态框 === -->
+        <div v-if="showMigrationModal" class="fixed inset-0 z-[120] flex items-center justify-center p-4 fullscreen-layer">
+          <div @click="!isMigrating && (showMigrationModal = false)" class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-all"></div>
+          <div class="bg-white w-full max-w-lg shadow-2xl relative z-10 animate-slide-up flex flex-col max-h-[85vh] rounded-xl overflow-hidden border border-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <span class="text-[11px] tracking-[0.2em] font-bold uppercase text-black">Data Migration (数据迁移)</span>
+              <button v-if="!isMigrating" @click="showMigrationModal = false" class="text-xl hover:text-red-500 text-gray-400">&times;</button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto custom-scrollbar space-y-6">
+              <!-- 目标账号配置 -->
+              <div>
+                <p class="text-[10px] text-gray-400 font-bold mb-3 tracking-widest uppercase">1. 目标 Supabase 账号</p>
+                <div class="space-y-3 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                  <input v-model="targetConfig.url" type="text" placeholder="目标 URL" class="w-full bg-white border border-gray-200 px-3 py-2 text-xs focus:border-black outline-none rounded" :disabled="isMigrating"/>
+                  <input v-model="targetConfig.key" type="password" placeholder="目标 ACCESS KEY" class="w-full bg-white border border-gray-200 px-3 py-2 text-xs focus:border-black outline-none rounded" :disabled="isMigrating"/>
+                  <div class="flex gap-3">
+                    <input v-model="targetConfig.email" type="email" placeholder="目标邮箱" class="w-full bg-white border border-gray-200 px-3 py-2 text-xs focus:border-black outline-none rounded" :disabled="isMigrating"/>
+                    <input v-model="targetConfig.password" type="password" placeholder="目标密码" class="w-full bg-white border border-gray-200 px-3 py-2 text-xs focus:border-black outline-none rounded" :disabled="isMigrating"/>
+                  </div>
+                </div>
+              </div>
 
+              <!-- 数据类型选择 -->
+              <div>
+                <p class="text-[10px] text-gray-400 font-bold mb-3 tracking-widest uppercase">2. 选择要迁移的数据类型</p>
+                <div class="grid grid-cols-3 gap-2">
+                  <label v-for="(label, key) in uploadTypes" :key="key" class="flex items-center gap-2 cursor-pointer p-2 border border-gray-100 rounded hover:bg-gray-50 transition-colors" :class="{'bg-gray-100 border-gray-300': migrationTypes.includes(key)}">
+                    <input type="checkbox" :value="key" v-model="migrationTypes" class="accent-black" :disabled="isMigrating">
+                    <span class="text-xs text-gray-700">{{ label }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 进度与日志 -->
+              <div v-if="migrationLogs.length > 0">
+                <p class="text-[10px] text-gray-400 font-bold mb-2 tracking-widest uppercase">迁移日志</p>
+                <div class="bg-black text-green-400 p-3 rounded-lg h-32 overflow-y-auto font-mono text-[9px] leading-relaxed custom-scrollbar flex flex-col-reverse">
+                  <div v-for="(log, i) in migrationLogs" :key="i">{{ log }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-6 border-t border-gray-100 bg-gray-50">
+              <button 
+                @click="startMigration" 
+                :disabled="isMigrating || migrationTypes.length === 0 || !targetConfig.url"
+                class="w-full py-4 text-white text-[10px] font-bold tracking-[0.2em] uppercase rounded shadow-lg transition-all"
+                :class="isMigrating ? 'bg-gray-400 cursor-not-allowed' : 'bg-black hover:bg-gray-800 active:scale-95'"
+              >
+                {{ isMigrating ? '迁移中，请勿关闭页面...' : '一键开始迁移' }}
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- === 新增结束 === -->
         <!-- iOS 安装引导弹窗 -->
         <div id="ios-install-guide" class="ios-install-guide">
           <div class="flex items-start gap-4">
@@ -2321,8 +2436,33 @@
                 "background: #d0d0d0; background-image: radial-gradient(#000 1px, transparent 1px); background-size: 4px 4px;",
             },
           ];
-
           const filter = ref("all");
+          // --- 新增搜索相关变量 ---
+          const searchInput = ref(""); 
+          const searchKeyword = ref(""); 
+                    // === 【新增】迁移模块状态变量 ===
+          const showMigrationModal = ref(false);
+          const isMigrating = ref(false);
+          const migrationTypes = ref(["role_card", "image", "text"]); // 默认选中几个
+          const migrationLogs = ref([]);
+          const targetConfig = ref({
+            url: "",
+            key: "",
+            email: "",
+            password: ""
+          });
+          // === 新增结束 ===
+          const triggerSearch = () => {
+            // 只需要赋值关键字，不要动其他的分类变量
+            searchKeyword.value = searchInput.value.trim(); 
+          };
+
+
+          const clearSearch = () => { 
+            searchInput.value = ""; 
+            searchKeyword.value = ""; 
+          };
+
           const currentAlbum = ref(null);
           const currentTag = ref(null);
           const showUpload = ref(false);
@@ -2494,6 +2634,28 @@
           });
           // === 新增：标签联想功能逻辑 ===
           const showTagList = ref(false);
+          // === 新增：相册联想功能逻辑 ===
+          const showAlbumList = ref(false);
+
+          const albumSuggestions = computed(() => {
+            const val = uploadForm.value.albumName || "";
+            if (!val.trim()) {
+                // 如果没输入，显示所有相册
+                return albumList.value;
+            }
+            
+            const search = val.toLowerCase().trim();
+            // 如果有输入，过滤出包含关键词的相册
+            return albumList.value.filter((album) => 
+                album.displayName.toLowerCase().includes(search)
+            );
+          });
+
+          const applyAlbumSuggestion = (albumName) => {
+            uploadForm.value.albumName = albumName;
+            showAlbumList.value = false;
+          };
+          // === 相册联想逻辑结束 ===
 
           // 1. 提取所有已存在的标签（去重）
           const allExistingTags = computed(() => {
@@ -2742,27 +2904,50 @@
             });
             return Object.values(albums);
           });
-
           const filteredItems = computed(() => {
+            let result = items.value;
+            
+            // 1. 关键字过滤
+            if (searchKeyword.value) {
+              const kw = String(searchKeyword.value).toLowerCase();
+              result = result.filter((i) => {
+                try {
+                  if (i.category && String(i.category).toLowerCase().includes(kw)) return true;
+                  if (i.album_name && String(i.album_name).toLowerCase().includes(kw)) return true;
+                  
+                  if (i.type === 'role_card') {
+                    const role = getRoleCardData(i);
+                    if (role.name && String(role.name).toLowerCase().includes(kw)) return true;
+                    if (role.description && String(role.description).toLowerCase().includes(kw)) return true;
+                  } else if (i.type === 'beautify') {
+                    const bData = getBeautifyData(i);
+                    if (bData.title && String(bData.title).toLowerCase().includes(kw)) return true;
+                  } else {
+                    if (i.content && String(i.content).toLowerCase().includes(kw)) return true;
+                  }
+                } catch (e) {}
+                return false; 
+              });
+            }
+
+            // 2. 原有的导航分类过滤 (注意这里全部变成了基于 result 继续过滤，而不是 items.value)
             if (currentAlbum.value)
-              return items.value.filter(
-                (i) => i.album_name === currentAlbum.value,
-              );
+              return result.filter((i) => i.album_name === currentAlbum.value);
             if (currentTag.value)
-              return items.value.filter((i) =>
-                getTags(i).includes(currentTag.value),
-              );
-            if (filter.value === "all") return items.value;
+              return result.filter((i) => getTags(i).includes(currentTag.value));
+            
+            if (filter.value === "all") return result; // <--- 关键修复点
             if (filter.value === "albums") return [];
             if (filter.value === "image") {
-              return items.value.filter((i) => {
+              return result.filter((i) => {
                 if (i.type !== "image") return false;
                 if (!i.album_name) return true;
                 return !i.album_name.startsWith(".");
               });
             }
-            return items.value.filter((i) => i.type === filter.value);
+            return result.filter((i) => i.type === filter.value);
           });
+
           // 1. 增加 isRestoring 参数，默认为 false
           const applyFont = (item, isRestoring = false) => {
             const fontName = `font_${item.id}`;
@@ -2825,6 +3010,128 @@
               }
             }, TWELVE_HOURS);
           };
+          // === 【新增】核心迁移函数 ===
+          const logMsg = (msg) => {
+            migrationLogs.value.unshift(`[${new Date().toLocaleTimeString()}] ${msg}`);
+          };
+
+          const startMigration = async () => {
+            try {
+              isMigrating.value = true;
+              migrationLogs.value = [];
+              logMsg("初始化目标数据库连接...");
+
+              const tUrl = targetConfig.value.url.trim();
+              const tKey = targetConfig.value.key.trim();
+              
+              if (!tUrl || !tKey) throw new Error("目标 URL 和 KEY 不能为空");
+
+              // 1. 登录目标账号
+              const targetSb = window.supabase.createClient(tUrl, tKey);
+              const { data: authData, error: authErr } = await targetSb.auth.signInWithPassword({
+                email: targetConfig.value.email.trim(),
+                password: targetConfig.value.password.trim(),
+              });
+              if (authErr) throw authErr;
+              logMsg("目标账号登录成功！正在获取目标数据进行排重...");
+
+              const targetUserId = authData.session.user.id;
+
+              // 2. 获取目标数据库已有的数据（用于排重）
+              const { data: targetItems } = await targetSb.from("fragments").select("*");
+              
+              // 3. 筛选需要迁移的本地数据
+              const itemsToMigrate = items.value.filter(item => migrationTypes.value.includes(item.type));
+              logMsg(`共匹配到 ${itemsToMigrate.length} 条待迁移数据。`);
+
+              // 获取旧存储桶URL基础路径，方便后续替换JSON里的URL（如角色卡）
+              const oldStorageBase = config.value.url.trim() + '/storage/v1/object/public/uploads/';
+              const newStorageBase = tUrl + '/storage/v1/object/public/uploads/';
+
+              // 4. 循环迁移
+              let successCount = 0;
+              let skipCount = 0;
+
+              for (let i = 0; i < itemsToMigrate.length; i++) {
+                const item = itemsToMigrate[i];
+                logMsg(`正在处理 (${i + 1}/${itemsToMigrate.length}): ${item.type} ...`);
+
+                // 【排重逻辑】如果类型、内容、分类完全一样，或者文件名一样，视为重复
+                const isDup = targetItems.some(t => {
+                  if (t.type !== item.type) return false;
+                  // 文本等直接对比内容
+                  if (t.content && item.content && t.content === item.content) return true;
+                  // 文件对比文件名
+                  if (t.file_url && item.file_url) {
+                    return t.file_url.split('/').pop().split('?')[0] === item.file_url.split('/').pop().split('?')[0];
+                  }
+                  return false;
+                });
+
+                if (isDup) {
+                  logMsg(`--> 跳过重复项 ID: ${item.id}`);
+                  skipCount++;
+                  continue;
+                }
+
+                let newFileUrl = item.file_url;
+                let newContent = item.content;
+
+                // 【文件搬运逻辑】如果有 file_url，将其下载并传到新账号
+                if (item.file_url && item.type !== 'link' && item.type !== 'font') {
+                  try {
+                    const fileName = item.file_url.split('/').pop().split('?')[0];
+                    logMsg(`  下载文件中: ${fileName}...`);
+                    const res = await fetch(item.file_url);
+                    const blob = await res.blob();
+
+                    logMsg(`  上传到新账号...`);
+                    // 上传到目标账号的 uploads 桶
+                    await targetSb.storage.from('uploads').upload(fileName, blob, { upsert: true });
+                    const { data: publicUrlData } = targetSb.storage.from('uploads').getPublicUrl(fileName);
+                    newFileUrl = publicUrlData.publicUrl;
+                  } catch (e) {
+                    logMsg(`  ! 文件搬运失败: ${e.message}`);
+                  }
+                }
+
+                // 【深度搬运】针对 JSON 内容（如 role_card、beautify 内部嵌套了多个旧链接）
+                if (newContent && typeof newContent === 'string' && newContent.includes('/storage/v1/object/public/uploads/')) {
+                  // 简单粗暴：直接将内容里的旧 Storage 前缀替换为新 Storage 前缀
+                  // （前提是所有历史文件你之前都下载/上传过，如果没迁移旧文件，新链接可能会失效。为了稳定，基础版直接作字符串替换）
+                  newContent = newContent.replaceAll(oldStorageBase, newStorageBase);
+                }
+
+                // 【写入目标数据库】
+                const payload = {
+                  type: item.type,
+                  category: item.category,
+                  content: newContent,
+                  file_url: newFileUrl,
+                  album_name: item.album_name,
+                  user_id: targetUserId,
+                  // 注意：不带原来的 id 和 created_at，让新库自动生成，避免冲突
+                };
+
+                const { error: insertErr } = await targetSb.from("fragments").insert(payload);
+                if (insertErr) {
+                  logMsg(`  ! 写入数据库失败: ${insertErr.message}`);
+                } else {
+                  successCount++;
+                }
+              }
+
+              logMsg(`🎉 迁移完成！成功: ${successCount}，跳过: ${skipCount}`);
+              // 迁移完成，注销目标账号的 session，避免干扰当前页面
+              await targetSb.auth.signOut();
+              
+            } catch (error) {
+              logMsg(`🚨 发生错误: ${error.message}`);
+            } finally {
+              isMigrating.value = false;
+            }
+          };
+          // === 新增结束 ===
 
           const initSupabase = async () => {
             try {
@@ -3861,6 +4168,47 @@
               alert(e.message);
             }
           };
+          // === 新增：批量删除整个相册功能 ===
+          const deleteCurrentAlbum = async () => {
+            if (!currentAlbum.value || !supabase) return;
+            const albumName = currentAlbum.value;
+            const itemsToDelete = items.value.filter(i => i.album_name === albumName);
+            
+            const displayAlbumName = albumName.startsWith('.') ? albumName.substring(1) : albumName;
+            
+            if (!confirm(`⚠️ 危险操作：\n确定要永久删除相册 "${displayAlbumName}" 及其包含的 ${itemsToDelete.length} 张图片吗？此操作无法恢复！`)) {
+              return;
+            }
+
+            loading.value = true;
+            try {
+              // 1. 批量收集需要从存储桶(Storage)删除的文件路径
+              const filePaths = itemsToDelete
+                .map(item => item.file_url ? item.file_url.split("/uploads/").pop() : null)
+                .filter(path => path);
+
+              if (filePaths.length > 0) {
+                const { error: storageError } = await supabase.storage.from("uploads").remove(filePaths);
+                if (storageError) console.error("批量删除文件失败:", storageError);
+              }
+
+              // 2. 批量从数据库删除记录
+              const { error: dbError } = await supabase.from("fragments").delete().eq("album_name", albumName);
+              if (dbError) throw dbError;
+
+              // 3. 更新本地数据状态
+              items.value = items.value.filter(i => i.album_name !== albumName);
+              
+              // 4. 重置视图，退回到相册列表页面
+              currentAlbum.value = null;
+              filter.value = "albums";
+              
+            } catch (e) {
+              alert("删除相册失败: " + e.message);
+            } finally {
+              loading.value = false;
+            }
+          };
 
           const handleOpenHtml = async (item) => {
             try {
@@ -4505,6 +4853,7 @@
             handleFileSelect,
             submitUpload,
             deleteItem,
+            deleteCurrentAlbum,
             handleOpenHtml,
             openLink,
             setFilter: (f) => {
@@ -4574,6 +4923,21 @@
             fontList,
             previewScale,
             lastPingTime,
+            searchInput,
+            searchKeyword,
+            triggerSearch,
+            clearSearch,
+            // === 【新增】暴露迁移变量 ===
+            showMigrationModal,
+            isMigrating,
+            migrationTypes,
+            migrationLogs,
+            targetConfig,
+            startMigration,
+            showAlbumList,
+            albumSuggestions,
+            applyAlbumSuggestion,
+            // === 新增结束 ===
           };
         },
       }).mount("#app");
