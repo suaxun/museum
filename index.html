@@ -512,6 +512,17 @@
                 class="absolute bottom-0 left-0 w-0 h-[2px] bg-black transition-all duration-500 peer-focus:w-full"
               ></span>
             </div>
+            <!-- === 新增：备用库输入区 === -->
+            <div class="w-full pt-4 border-t border-black/10 mt-2 mb-2">
+              <div class="text-[9px] text-black/40 font-bold mb-2 tracking-widest text-left">BACKUP STORAGE (可选)</div>
+              <div class="relative group mb-2">
+                <input v-model="configB.url" type="text" placeholder="BACKUP URL" style="color: #000000 !important; -webkit-text-fill-color: #000000 !important;" class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.1em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
+              </div>
+              <div class="relative group">
+                <input v-model="configB.key" type="password" placeholder="BACKUP KEY" style="color: #000000 !important; -webkit-text-fill-color: #000000 !important;" class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.1em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
+              </div>
+            </div>
+            <!-- === 新增结束 === -->
 
             <!-- 邮箱/密码 组合 -->
             <div class="space-y-6 pt-2">
@@ -708,7 +719,16 @@
 >
   数据迁移
 </button>
-<!-- === 新增结束 === -->
+              <!-- === 修改：变成批量管理入口 === -->
+              <button
+                v-if="session"
+                @click="toggleBatchMode"
+                class="text-[10px] ml-4 shrink-0 transition-all border px-2 py-1 rounded"
+                :class="isBatchMode ? 'bg-green-500 text-white border-green-500 shadow-lg' : 'text-green-500 border-green-200 hover:bg-green-50 hover:text-green-600'"
+              >
+                {{ isBatchMode ? '取消批量' : '批量搬运/管理' }}
+              </button>
+
               <button
                 @click="handleLogout"
                 class="text-[10px] text-gray-300 hover:text-black ml-4 shrink-0"
@@ -763,6 +783,20 @@
                     class="absolute inset-0 flex items-center justify-center text-[10px] text-gray-300 tracking-widest"
                   >
                     无封面
+                  </div>
+                                    <!-- 相册专属的批量选择遮罩层 -->
+                  <div 
+                    v-if="isBatchMode"
+                    @click.stop="toggleAlbumSelection(album.realName)"
+                    class="absolute inset-0 z-50 cursor-pointer border-4 transition-all flex items-start justify-end p-3 backdrop-blur-[1px]"
+                    :class="isAlbumSelected(album.realName) ? 'border-green-500 bg-green-500/20' : 'border-transparent bg-black/5 hover:bg-black/10'"
+                  >
+                    <div 
+                      class="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm"
+                      :class="isAlbumSelected(album.realName) ? 'bg-green-500 border-green-500 text-white' : 'border-white bg-black/20'"
+                    >
+                      <span v-if="isAlbumSelected(album.realName)" class="text-sm">✓</span>
+                    </div>
                   </div>
                 </div>
                 <div
@@ -1314,10 +1348,37 @@
                     </div>
                   </div>
                 </div>
+                              <!-- === 新增：批量选择遮罩层（仅在开启批量模式时显示，盖住原有按钮防误触） === -->
+                <div 
+                  v-if="isBatchMode"
+                  @click.stop="toggleSelection(item.id)"
+                  class="absolute inset-0 z-50 cursor-pointer border-4 transition-all rounded-xl flex items-start justify-end p-3 backdrop-blur-[1px]"
+                  :class="selectedIds.includes(item.id) ? 'border-green-500 bg-green-500/20' : 'border-transparent bg-black/5 hover:bg-black/10'"
+                >
+                  <!-- 勾选圈圈 -->
+                  <div 
+                    class="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm"
+                    :class="selectedIds.includes(item.id) ? 'bg-green-500 border-green-500 text-white' : 'border-white bg-black/20'"
+                  >
+                    <span v-if="selectedIds.includes(item.id)" class="text-sm">✓</span>
+                  </div>
+                </div>
+              
               </div>
             </template>
           </div>
         </main>
+        <!-- === 新增：批量操作底部悬浮栏 === -->
+        <div v-if="isBatchMode" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md text-white px-6 py-4 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.3)] z-[200] flex items-center gap-6 whitespace-nowrap animate-slide-up border border-white/10">
+            <span class="text-xs font-bold tracking-wider">已选 <span class="text-green-400 text-sm">{{ selectedIds.length }}</span> 项</span>
+            <div class="w-px h-4 bg-gray-600"></div>
+            <button @click="selectAllFiltered" class="text-[10px] font-bold tracking-widest hover:text-green-400 transition-colors uppercase">全选当前视图</button>
+            <button @click="selectedIds = []" class="text-[10px] text-gray-400 hover:text-white transition-colors">清空</button>
+            <div class="w-px h-4 bg-gray-600"></div>
+            <button @click="startStorageMigration" class="text-[10px] bg-green-500 text-black px-4 py-2 rounded-full font-bold hover:bg-green-400 hover:scale-105 active:scale-95 transition-all uppercase tracking-widest shadow-lg shadow-green-500/30">
+              迁移至备用库
+            </button>
+        </div>
 
         <!-- 悬浮上传按钮 -->
         <button
@@ -1776,6 +1837,17 @@
               </button>
             </div>
             <div class="p-8 space-y-6 overflow-y-auto">
+                            <!-- === 新增：存储路线选择开关 (仅在配置了备用库时显示) === -->
+              <div v-if="configB.url" class="flex gap-4 border-b border-gray-100 pb-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" v-model="uploadForm.targetStorage" value="auto" class="accent-black w-3 h-3" />
+                  <span class="text-[10px] tracking-widest text-black font-bold">智能路线 (主库优先)</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" v-model="uploadForm.targetStorage" value="backup" class="accent-green-500 w-3 h-3" />
+                  <span class="text-[10px] tracking-widest text-green-600 font-bold">直达备用库 (Backup)</span>
+                </label>
+              </div>
               <div
                 class="flex gap-6 border-b border-gray-100 pb-px overflow-x-auto no-scroll"
               >
@@ -2360,6 +2432,7 @@
             url: "", //以此为空，让用户自己填
             key: "",
           });
+          const configB = ref({ url: "", key: "" });
           const auth = ref({ email: "", password: "" });
           const session = ref(null);
           const items = ref([]);
@@ -2456,6 +2529,62 @@
             // 只需要赋值关键字，不要动其他的分类变量
             searchKeyword.value = searchInput.value.trim(); 
           };
+                    // === 新增：批量选择模式状态 ===
+          const isBatchMode = ref(false);
+          const selectedIds = ref([]);
+
+          const toggleBatchMode = () => {
+            isBatchMode.value = !isBatchMode.value;
+            selectedIds.value = []; // 退出时清空选择
+          };
+
+          const toggleSelection = (id) => {
+            const idx = selectedIds.value.indexOf(id);
+            if (idx > -1) {
+              selectedIds.value.splice(idx, 1);
+            } else {
+              selectedIds.value.push(id);
+            }
+          };
+
+          // === 新增：判断相册是否已被全选 ===
+          const isAlbumSelected = (albumName) => {
+            const albumItems = items.value.filter(i => i.album_name === albumName);
+            if (albumItems.length === 0) return false;
+            // 如果该相册里的每一张图的 ID 都在 selectedIds 里，就说明该相册被全选了
+            return albumItems.every(i => selectedIds.value.includes(i.id));
+          };
+
+          // === 新增：点击相册遮罩时的处理逻辑 ===
+          const toggleAlbumSelection = (albumName) => {
+            const albumItems = items.value.filter(i => i.album_name === albumName);
+            const allSelected = isAlbumSelected(albumName);
+
+            if (allSelected) {
+              // 取消选择该相册的所有图片
+              const idsToRemove = albumItems.map(i => i.id);
+              selectedIds.value = selectedIds.value.filter(id => !idsToRemove.includes(id));
+            } else {
+              // 把该相册的所有图片加入选择
+              const newIds = albumItems.map(i => i.id);
+              selectedIds.value = [...new Set([...selectedIds.value, ...newIds])];
+            }
+          };
+
+          // === 修改：让“全选当前”按钮兼容相册列表界面 ===
+          const selectAllFiltered = () => {
+            if (filter.value === 'albums' && !currentAlbum.value) {
+              // 场景1：如果在“相册封面列表”界面，全选所有相册里的所有图片
+              const newIds = items.value.filter(i => i.album_name).map(i => i.id);
+              selectedIds.value = [...new Set([...selectedIds.value, ...newIds])];
+            } else {
+              // 场景2：在其他界面（含进入某一个具体相册后），把当前屏幕上看到的项全部选中
+              const newIds = filteredItems.value.map(i => i.id);
+              selectedIds.value = [...new Set([...selectedIds.value, ...newIds])];
+            }
+          };
+
+
 
 
           const clearSearch = () => { 
@@ -2530,6 +2659,11 @@
             // 1. 恢复读取 URL 缓存
             const u = localStorage.getItem("sb_url");
             const k = localStorage.getItem("sb_key");
+            const uB = localStorage.getItem("sb_url_b"); // <--- 新增
+const kB = localStorage.getItem("sb_key_b"); // <--- 新增
+
+if (uB) configB.value.url = uB; // <--- 新增
+if (uB && kB) configB.value.key = kB; // <--- 新增
             const savedEmail = localStorage.getItem("sb_email");
             const savedPass = localStorage.getItem("sb_pass");
 
@@ -2612,6 +2746,7 @@
           };
           const uploadForm = ref({
             type: "text",
+            targetStorage: "auto", 
             category: "",
             title: "",
             url: "",
@@ -3161,31 +3296,55 @@
             try {
               const u = config.value.url.trim();
 
-              // === 修复核心：暴力清洗 Key ===
               // 1. 获取输入框的值
               let rawKey = config.value.key;
-
               const k = rawKey.trim();
 
               if (!k) throw new Error("Key 不能为空");
 
-              // 3. 更新回输入框，让用户看到清洗后的结果
+              // 3. 更新回输入框
               config.value.key = k;
 
-              // 4. 存入缓存
+              // 4. 存入缓存 (这里新增了备用库 url_b 和 key_b 的保存)
               localStorage.setItem("sb_url", u);
               localStorage.setItem("sb_key", k);
+              localStorage.setItem("sb_url_b", configB.value.url.trim());
+              localStorage.setItem("sb_key_b", configB.value.key.trim());
               localStorage.setItem("sb_email", auth.value.email.trim());
               localStorage.setItem("sb_pass", auth.value.password.trim());
-              // === 修复核心：强制重建客户端 ===
-              // 不要判断 if (!supabase)，直接覆盖，确保使用最新的 Key
+              
+              // === 强制重建主客户端 ===
               supabase = window.supabase.createClient(u, k);
 
+              // 主库登录
               const { data, error } = await supabase.auth.signInWithPassword({
                 email: auth.value.email.trim(),
                 password: auth.value.password.trim(),
               });
-              if (error) throw error;
+              if (error) throw error; // 如果主库登录失败，直接中断报错
+
+              // === 新增：重建并登录备用客户端 ===
+              // 如果用户填了备用库，我们就顺便帮他把备用库也登录上
+              if (configB.value.url && configB.value.key) {
+                try {
+                  window.supabaseB = window.supabase.createClient(configB.value.url.trim(), configB.value.key.trim());
+                  const { error: bError } = await window.supabaseB.auth.signInWithPassword({
+                    email: auth.value.email.trim(),
+                    password: auth.value.password.trim(),
+                  });
+                  if (bError) {
+                    console.warn("备用库登录失败，但不影响主库使用:", bError.message);
+                    window.supabaseB = null; // 密码错的话就把备用库清空，防止后面上传报错
+                  } else {
+                    console.log("备用库连接成功！已准备好自动接力。");
+                  }
+                } catch (err) {
+                   console.warn("备用库初始化异常:", err.message);
+                   window.supabaseB = null;
+                }
+              }
+
+              // 登录成功，开始加载数据
               session.value = data.session;
               fetchData();
               startKeepAlive();
@@ -3198,11 +3357,124 @@
             }
           };
 
+
           const handleLogout = async () => {
             if (supabase) await supabase.auth.signOut();
             session.value = null;
             items.value = [];
           };
+           // === 【更新】：基于多选的主库搬运与瘦身 ===
+          const startStorageMigration = async () => {
+            if (selectedIds.value.length === 0) {
+              alert("请先点击卡片，选择需要搬运的文件！");
+              return;
+            }
+            if (!window.supabaseB) {
+              alert("未连接备用库！请先退出，在登录页面填入 BACKUP URL 和 KEY。");
+              return;
+            }
+            if (!confirm(`确定将选中的 ${selectedIds.value.length} 个项目搬运到备用库，并删除主库源文件吗？\n\n（搬运期间请勿关闭页面）`)) return;
+
+            // 弹出日志窗口
+            showMigrationModal.value = true;
+            isMigrating.value = true;
+            migrationLogs.value = [];
+            migrationTypes.value = [];
+            targetConfig.value.url = '占用';
+
+            const logMsg = (msg) => {
+              migrationLogs.value.unshift(`[${new Date().toLocaleTimeString()}] ${msg}`);
+            };
+
+            const mainStoragePrefix = config.value.url.trim() + '/storage/v1/object/public/uploads/';
+            const backupStoragePrefix = configB.value.url.trim() + '/storage/v1/object/public/uploads/';
+
+            // ⚠️ 关键修改：只过滤出用户选中的那些项
+            const itemsToMove = items.value.filter(item => selectedIds.value.includes(item.id));
+
+            logMsg(`开始搬运用户选中的 ${itemsToMove.length} 个项目...`);
+
+            let successCount = 0;
+            let skipCount = 0;
+
+            for (let i = 0; i < itemsToMove.length; i++) {
+              const item = itemsToMove[i];
+              logMsg(`正在处理 (${i + 1}/${itemsToMove.length}) ...`);
+
+              // 检查该项目是否已经在备用库了 (避免重复搬运)
+              const isMainImage = item.file_url && item.file_url.includes(mainStoragePrefix);
+              const isMainContent = item.content && typeof item.content === 'string' && item.content.includes(mainStoragePrefix);
+              
+              if (!isMainImage && !isMainContent) {
+                 logMsg(`  -> 跳过：该文件已经在备用库，或无需搬运。`);
+                 skipCount++;
+                 continue;
+              }
+
+              try {
+                let newFileUrl = item.file_url;
+                let newContent = item.content;
+                let filesToDelete = [];
+
+                // 1. 搬运表图/主文件
+                if (isMainImage) {
+                  const fname = item.file_url.split('/').pop().split('?')[0];
+                  logMsg(`  -> 下载原文件: ${fname}`);
+                  const blob = await fetch(item.file_url).then(r => r.blob());
+                  
+                  logMsg(`  -> 上传至备用库...`);
+                  await window.supabaseB.storage.from("uploads").upload(fname, blob, { upsert: true });
+                  
+                  newFileUrl = window.supabaseB.storage.from("uploads").getPublicUrl(fname).data.publicUrl;
+                  filesToDelete.push(fname);
+                }
+
+                // 2. 深度搬运 JSON (如角色卡内嵌图片)
+                if (isMainContent) {
+                  const regex = new RegExp(mainStoragePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^"\'\\\\\\s<>]+)', 'g');
+                  let match;
+                  while ((match = regex.exec(newContent)) !== null) {
+                    const fname = match[1];
+                    if (!filesToDelete.includes(fname)) {
+                      logMsg(`  -> 下载内嵌隐藏文件: ${fname}`);
+                      const blob = await fetch(mainStoragePrefix + fname).then(r => r.blob());
+                      logMsg(`  -> 上传内嵌隐藏文件...`);
+                      await window.supabaseB.storage.from("uploads").upload(fname, blob, { upsert: true });
+                      filesToDelete.push(fname);
+                    }
+                  }
+                  newContent = newContent.replaceAll(mainStoragePrefix, backupStoragePrefix);
+                }
+
+                // 3. 更新主库数据库记录
+                logMsg(`  -> 更新数据库地址...`);
+                const { error: dbErr } = await supabase.from('fragments').update({
+                  file_url: newFileUrl,
+                  content: newContent
+                }).eq('id', item.id);
+                if (dbErr) throw dbErr;
+
+                // 4. 删除主库文件释放空间
+                if (filesToDelete.length > 0) {
+                  logMsg(`  -> 删除主库源文件以腾出空间...`);
+                  await supabase.storage.from("uploads").remove(filesToDelete);
+                }
+
+                successCount++;
+              } catch (e) {
+                logMsg(`  ! 处理失败: ${e.message}`);
+              }
+            }
+
+            logMsg(`🎉 搬运完成！成功: ${successCount}，跳过: ${skipCount}。请刷新页面。`);
+            isMigrating.value = false;
+            
+            // 退出批量模式并清理状态
+            selectedIds.value = [];
+            isBatchMode.value = false;
+            await fetchData();
+          };
+
 
           // ... 修改 fetchData 函数，在获取数据后调用上面这个函数 ...
           const fetchData = async () => {
@@ -4426,38 +4698,80 @@
               loading.value = false;
             }
           };
+          // === 【加强版】智能降级标准上传 (支持强制走备用库) ===
+          const uploadToStorage = async (file, fileName, options = {}) => {
+            // 检查用户是否在面板上选择了“直达备用库”
+            const forceBackup = uploadForm.value.targetStorage === 'backup';
 
-          // TUS 上传辅助函数：处理大文件
+            if (forceBackup && window.supabaseB) {
+              console.log("👉 用户指定直达备用库...");
+              const { data, error } = await window.supabaseB.storage.from("uploads").upload(fileName, file, options);
+              if (error) throw new Error("备用存储上传失败: " + error.message);
+              return window.supabaseB.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+            }
+
+            try {
+              // 否则走默认的“智能路线”：优先尝试主库 A
+              const { data, error } = await supabase.storage.from("uploads").upload(fileName, file, options);
+              if (error) throw error;
+              return supabase.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+            } catch (err) {
+              console.warn("主存储上传失败，原因:", err.message);
+              if (!window.supabaseB) throw new Error("主存储失败，且未配置备用存储！原错误: " + err.message);
+              
+              console.log("🔄 正在自动切换至备用存储 (Supabase B)...");
+              const { data, error } = await window.supabaseB.storage.from("uploads").upload(fileName, file, options);
+              if (error) throw new Error("备用存储也满或失败了: " + error.message);
+              return window.supabaseB.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+            }
+          };
+
+          // === 【加强版】智能降级 TUS 断点续传 (支持强制走备用库) ===
           const uploadWithTus = (file, fileName) => {
-            return new Promise((resolve, reject) => {
-              // 构造 TUS 上传端点：[PROJECT_URL]/storage/v1/upload/resumable
-              const endpoint = `${config.value.url.replace(/\/$/, "")}/storage/v1/upload/resumable`;
+            return new Promise(async (resolve, reject) => { // 注意这里加了 async
+              const forceBackup = uploadForm.value.targetStorage === 'backup';
 
-              const upload = new tus.Upload(file, {
-                endpoint: endpoint,
-                retryDelays: [0, 3000, 5000, 10000, 20000],
-                headers: {
-                  authorization: `Bearer ${session.value.access_token}`,
-                  "x-client-info": "supabase-js-web",
-                },
-                metadata: {
-                  bucketName: "uploads",
-                  objectName: fileName,
-                  contentType: file.type,
-                  cacheControl: "3600",
-                },
-                chunkSize: 6 * 1024 * 1024, // 6MB chunks
-                onError: (error) => {
-                  console.error("TUS Upload Failed:", error);
-                  reject(error);
-                },
-                onSuccess: () => {
-                  resolve();
-                },
-              });
-              upload.start();
+              const startTus = (client, endpointUrl, token, isFallback = false) => {
+                const endpoint = `${endpointUrl.replace(/\/$/, "")}/storage/v1/upload/resumable`;
+                const upload = new tus.Upload(file, {
+                  endpoint: endpoint,
+                  retryDelays: [0, 3000, 5000],
+                  headers: {
+                    authorization: `Bearer ${token}`,
+                    "x-client-info": "supabase-js-web",
+                  },
+                  metadata: { bucketName: "uploads", objectName: fileName, contentType: file.type, cacheControl: "3600" },
+                  chunkSize: 6 * 1024 * 1024,
+                  onError: async (error) => {
+                    console.error("TUS 上传失败:", error);
+                    // 只有在【智能模式】且当前是【主库】报错时，才自动切换备用库
+                    if (!forceBackup && !isFallback && client === supabase && window.supabaseB) {
+                        console.log("🔄 自动切换备用存储进行 TUS 断点续传...");
+                        const { data } = await window.supabaseB.auth.getSession();
+                        startTus(window.supabaseB, configB.value.url, data.session.access_token, true);
+                    } else {
+                        reject(error);
+                    }
+                  },
+                  onSuccess: () => {
+                    const url = client.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+                    resolve(url); 
+                  },
+                });
+                upload.start();
+              };
+
+              // 根据用户的选择，决定从哪个库发车
+              if (forceBackup && window.supabaseB) {
+                const { data } = await window.supabaseB.auth.getSession();
+                startTus(window.supabaseB, configB.value.url, data.session.access_token, true);
+              } else {
+                startTus(supabase, config.value.url, session.value.access_token, false);
+              }
             });
           };
+
+
           const submitUpload = async () => {
             if (!supabase) return;
             uploading.value = true;
@@ -4535,20 +4849,15 @@
                   history: finalHistory,
                 };
 
-                // 定义内部上传函数
+                // 定义内部上传函数 (修改后)
                 const uploadRoleFile = async (file, prefix) => {
                   if (!file) return null;
                   const ext = file.name.split(".").pop();
                   const fname = `role_${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${ext}`;
-                  const { error } = await supabase.storage
-                    .from("uploads")
-                    .upload(fname, file);
-                  if (error) throw error;
-                  const { data } = supabase.storage
-                    .from("uploads")
-                    .getPublicUrl(fname);
-                  return data.publicUrl;
+                  // 直接调用智能降级上传
+                  return await uploadToStorage(file, fname);
                 };
+
 
                 // 并行上传三个文件
                 const [pngUrl, jsonUrl, qrUrl] = await Promise.all([
@@ -4622,14 +4931,7 @@
                   if (v.previewFile) {
                     const pExt = v.previewFile.name.split(".").pop();
                     const pName = `beautify_prev_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${pExt}`;
-                    const { error: pErr } = await supabase.storage
-                      .from("uploads")
-                      .upload(pName, v.previewFile);
-                    if (pErr) throw pErr;
-                    const { data: pData } = supabase.storage
-                      .from("uploads")
-                      .getPublicUrl(pName);
-                    previewUrl = pData.publicUrl;
+                    previewUrl = await uploadToStorage(v.previewFile, pName);
                   }
 
                   let realUrl = v.realUrl;
@@ -4637,17 +4939,10 @@
                     const fExt = v.realFile.name.split(".").pop();
                     const fName = `beautify_file_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fExt}`;
                     if (v.realFile.size > 6 * 1024 * 1024) {
-                      await uploadWithTus(v.realFile, fName);
+                      realUrl = await uploadWithTus(v.realFile, fName);
                     } else {
-                      const { error: fErr } = await supabase.storage
-                        .from("uploads")
-                        .upload(fName, v.realFile);
-                      if (fErr) throw fErr;
+                      realUrl = await uploadToStorage(v.realFile, fName);
                     }
-                    const { data: fData } = supabase.storage
-                      .from("uploads")
-                      .getPublicUrl(fName);
-                    realUrl = fData.publicUrl;
                   }
                   variations.push({
                     name: v.colorValue,
@@ -4732,37 +5027,34 @@
                       const ext = f.name.split(".").pop();
                       const fname = `${Date.now()}-${Math.random().toString(36).substr(2, 5)}.${ext}`;
 
+                      // --- 替换为这段新代码 ---
+                      let filePublicUrl = ""; // 新增一个变量来接收真实的图片链接
+
                       if (f.size > 6 * 1024 * 1024) {
-                        await uploadWithTus(f, fname);
+                        // 如果大于 6MB 用断点续传（智能版）
+                        filePublicUrl = await uploadWithTus(f, fname);
                       } else {
-                        const { error } = await supabase.storage
-                          .from("uploads")
-                          .upload(fname, f, {
-                            contentType:
-                              ext === "html"
-                                ? "text/html"
-                                : ext === "ttf" ||
-                                    ext === "otf" ||
-                                    ext === "woff"
-                                  ? "font/" + ext
-                                  : undefined,
-                          });
-                        if (error) throw error;
+                        // 小文件用标准上传（智能版）
+                        const contentType =
+                          ext === "html"
+                            ? "text/html"
+                            : ext === "ttf" || ext === "otf" || ext === "woff"
+                              ? "font/" + ext
+                              : undefined;
+                        // 调用我们刚才写的自动切换库的函数
+                        filePublicUrl = await uploadToStorage(f, fname, { contentType });
                       }
 
-                      const { data } = supabase.storage
-                        .from("uploads")
-                        .getPublicUrl(fname);
-
-                      // 插入每张图片的记录
+                      // 插入每张图片的记录 (永远插入主库的数据库)
                       return supabase.from("fragments").insert({
                         type,
                         category: cat,
-                        content: type === "font" ? content || f.name : title, // 字体用输入的名字，图片用标题
-                        file_url: data.publicUrl,
+                        content: type === "font" ? content || f.name : title,
+                        file_url: filePublicUrl, // <-- 关键修改：存入刚才获取到的真实链接
                         user_id: uid,
                         album_name: payload.album_name,
                       });
+                      // --- 替换结束 ---
                     }),
                   );
                 }
@@ -4826,6 +5118,7 @@
 
           return {
             config,
+            configB,
             auth,
             session,
             items,
@@ -4848,6 +5141,13 @@
             exportItem,
             exportStyle,
             quoteCanvas,
+            isBatchMode,
+            selectedIds,
+            toggleBatchMode,
+            toggleSelection,
+            selectAllFiltered,
+            isAlbumSelected,      // <--- 补充这行
+            toggleAlbumSelection, // <--- 补充这
             handleLogin,
             handleLogout,
             handleFileSelect,
@@ -4934,6 +5234,7 @@
             migrationLogs,
             targetConfig,
             startMigration,
+            startStorageMigration,
             showAlbumList,
             albumSuggestions,
             applyAlbumSuggestion,
