@@ -1925,13 +1925,26 @@
                   placeholder="角色名称"
                   class="w-full bg-gray-50 px-4 py-3 text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-black transition-all"
                 />
-                <!-- === 新增：角色介绍输入框 === -->
-                <textarea
-                  v-model="roleCardForm.description"
-                  rows="4"
-                  placeholder="角色介绍 / 背景故事 (显示在卡片背面，支持换行)"
-                  class="w-full bg-gray-50 px-4 py-3 text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-black transition-all resize-none custom-scrollbar"
-                ></textarea>
+<!-- === 新增：角色介绍输入框 === -->
+<div class="relative">
+  <textarea
+    v-model="roleCardForm.description"
+    rows="4"
+    placeholder="角色介绍 / 背景故事 (显示在卡片背面，支持换行)"
+    class="w-full bg-gray-50 px-4 py-3 text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-black transition-all resize-none custom-scrollbar"
+  ></textarea>
+  <!-- 👇 按钮：只在检测到描述时显示 -->
+  <button
+    v-if="extractedDescription"
+    @click.stop="fillDescription"
+    type="button"
+    class="absolute top-2 right-2 text-[9px] px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+  >
+    一键填充描述
+  </button>
+</div>
+
+
                 <!-- === 结束 === -->
 
                 <!-- 新增：更新日志输入框 -->
@@ -1948,12 +1961,13 @@
                     class="text-[9px] text-sub uppercase tracking-widest mb-1 block"
                     >角色卡图 (PNG) <span class="text-red-400">*</span></label
                   >
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    @change="e => roleCardForm.pngFile = e.target.files[0]"
-                    class="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:bg-gray-100 file:text-black hover:file:bg-gray-200"
-                  />
+<input
+  type="file"
+  accept="image/png,image/jpeg"
+  @change="handleRolePngUpload"
+  class="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:bg-gray-100 file:text-black hover:file:bg-gray-200"
+/>
+
                 </div>
 
                 <!-- JSON 数据 (可选) -->
@@ -1963,12 +1977,12 @@
                     >数据文件 (JSON)
                     <span class="text-gray-300">可选</span></label
                   >
-                  <input
-                    type="file"
-                    accept=".json"
-                    @change="e => roleCardForm.jsonFile = e.target.files[0]"
-                    class="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:bg-gray-100 file:text-black hover:file:bg-gray-200"
-                  />
+<input
+  type="file"
+  accept=".json"
+  @change="handleRoleJsonUpload"
+  class="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:bg-gray-100 file:text-black hover:file:bg-gray-200"
+/>
                 </div>
 
                 <!-- QR 码 (可选) -->
@@ -2633,18 +2647,22 @@
           // === 新增：角色卡历史记录模态框状态 ===
           const showHistoryModal = ref(false);
           const currentHistoryItem = ref(null);
+const roleCardForm = ref({
+  name: "",
+  description: "",
+  pngFile: null,
+  jsonFile: null,
+  qrFile: null,
+  note: "",
+});
+const extractedDescription = ref('');
 
-          // 角色卡表单专属数据
-          const roleCardForm = ref({
-            name: "",
-            description: "", // <--- 新增这一行
-            pngFile: null,
-            jsonFile: null,
-            qrFile: null,
-            note: "",
-          });
-
-          // 美化相关的状态管理：存储每个卡片当前选中的颜色索引 { itemId: index }
+const fillDescription = () => {
+  if (extractedDescription.value) {
+    roleCardForm.value.description = extractedDescription.value;
+    extractedDescription.value = ''; // 填充后清空提示
+  }
+};
           const beautifyStates = ref({});
 
           const showInstallBtn = ref(false);
@@ -4842,13 +4860,12 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
                   }
                 }
 
-                // 3. 组装当前数据对象
-                let currentData = {
-                  name: finalName || "未命名角色",
-                  description: roleCardForm.value.description || "", // <--- 新增：保存介绍
-                  history: finalHistory,
-                };
-
+  // 3. 组装当前数据对象
+  let currentData = {
+    name: finalName || "未命名角色",
+    description: roleCardForm.value.description || "",
+    history: finalHistory,
+  };
                 // 定义内部上传函数 (修改后)
                 const uploadRoleFile = async (file, prefix) => {
                   if (!file) return null;
@@ -4893,9 +4910,8 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
                   }
                 }
 
-                // 赋值给 payload
-                payload.content = JSON.stringify(currentData);
-                payload.file_url = finalFileUrl;
+  payload.content = JSON.stringify(currentData, null, 0); // 👈 这里改成单行,不要格式化
+  payload.file_url = finalFileUrl;
 
                 // 新建卡片必须有封面
                 if (!editingId.value && !payload.file_url) {
@@ -5116,6 +5132,232 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
             { deep: true }, // 深度监听：监听对象内部的属性变化
           );
 
+// 从 PNG 提取角色卡数据（修复中文乱码版）
+const extractCharDataFromPNG = async (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const arrayBuffer = e.target.result;
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        let offset = 8; // 跳过 PNG 文件头
+        
+        while (offset < uint8Array.length - 12) {
+          // 读取 chunk 长度
+          const length = new DataView(arrayBuffer, offset, 4).getUint32(0);
+          
+          // 读取 chunk 类型
+          const type = String.fromCharCode(
+            uint8Array[offset + 4],
+            uint8Array[offset + 5],
+            uint8Array[offset + 6],
+            uint8Array[offset + 7]
+          );
+          
+          // 只处理 tEXt 和 iTXt
+          if (type === 'tEXt' || type === 'iTXt') {
+            const chunkData = uint8Array.slice(offset + 8, offset + 8 + length);
+            
+            // 找到关键字结束位置（第一个 null 字节）
+            let keywordEnd = 0;
+            while (keywordEnd < chunkData.length && chunkData[keywordEnd] !== 0) {
+              keywordEnd++;
+            }
+            
+            // 提取关键字
+            const keyword = new TextDecoder('utf-8').decode(chunkData.slice(0, keywordEnd));
+            
+            // 检查是否是角色卡数据
+            if (keyword === 'chara' || keyword === 'ccv3' || keyword === 'characterCard') {
+              let textStart = keywordEnd + 1;
+              
+              // iTXt 需要跳过额外的字段
+              if (type === 'iTXt') {
+                // 跳过压缩标志和压缩方法
+                textStart += 2;
+                // 跳过语言标签（找到下一个 null）
+                while (textStart < chunkData.length && chunkData[textStart] !== 0) {
+                  textStart++;
+                }
+                textStart++; // 跳过 null
+                // 跳过翻译关键字（找到下一个 null）
+                while (textStart < chunkData.length && chunkData[textStart] !== 0) {
+                  textStart++;
+                }
+                textStart++; // 跳过 null
+              }
+              
+              // 提取 JSON 文本（关键：这里必须用 UTF-8）
+              const jsonBytes = chunkData.slice(textStart);
+              let jsonText = new TextDecoder('utf-8').decode(jsonBytes);
+              
+              // 尝试解析 JSON
+              try {
+                const parsed = JSON.parse(jsonText);
+                return resolve(parsed);
+              } catch (e) {
+                // 可能是 base64 编码
+                try {
+                  const decoded = atob(jsonText);
+                  // 将 decoded 字符串转回 Uint8Array 再用 UTF-8 解码
+                  const bytes = new Uint8Array(decoded.length);
+                  for (let i = 0; i < decoded.length; i++) {
+                    bytes[i] = decoded.charCodeAt(i);
+                  }
+                  const decodedText = new TextDecoder('utf-8').decode(bytes);
+                  const parsed = JSON.parse(decodedText);
+                  return resolve(parsed);
+                } catch (e2) {
+                  console.warn('base64 解码失败:', e2);
+                }
+              }
+            }
+          }
+          
+          // 移动到下一个 chunk
+          offset += 12 + length;
+        }
+        
+        resolve(null); // 没找到角色卡数据
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+};
+
+
+const handleRolePngUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  roleCardForm.value.pngFile = file;
+  
+  if (!file.type.includes('png')) return;
+  
+  try {
+    const charData = await extractCharDataFromPNG(file);
+    
+    // 👇 添加调试日志
+    console.log('=== PNG 提取的原始数据 ===');
+    console.log('完整对象:', charData);
+    console.log('name 字段:', charData?.name);
+    console.log('data.name 字段:', charData?.data?.name);
+    console.log('description 字段:', charData?.description);
+    console.log('data.description 字段:', charData?.data?.description);
+    
+    if (charData) {
+      const possibleNameFields = [
+        'name',
+        'char_name',
+        'data.name',
+        'character_name',
+      ];
+      
+      let extractedName = '';
+      for (const field of possibleNameFields) {
+        if (field.includes('.')) {
+          const keys = field.split('.');
+          let value = charData;
+          for (const key of keys) {
+            value = value?.[key];
+            if (!value) break;
+          }
+          if (value && typeof value === 'string') {
+            extractedName = value;
+            console.log('✅ 找到名字:', extractedName); // 👈 新增
+            break;
+          }
+        } else {
+          if (charData[field] && typeof charData[field] === 'string') {
+            extractedName = charData[field];
+            console.log('✅ 找到名字:', extractedName); // 👈 新增
+            break;
+          }
+        }
+      }
+      
+      if (extractedName && !roleCardForm.value.name) {
+        roleCardForm.value.name = extractedName.trim();
+        console.log('✅ 已填充名字到表单:', roleCardForm.value.name); // 👈 新增
+      }
+      
+      if (charData.description) {
+        extractedDescription.value = charData.description.trim();
+        console.log('✅ 已保存描述:', extractedDescription.value.substring(0, 50) + '...'); // 👈 新增
+      } else if (charData?.data?.description) {
+        extractedDescription.value = charData.data.description.trim();
+        console.log('✅ 已保存描述:', extractedDescription.value.substring(0, 50) + '...'); // 👈 新增
+      }
+    }
+  } catch (err) {
+    console.error('❌ PNG 数据提取失败:', err);
+  }
+};
+
+
+
+// JSON 文件上传处理
+const handleRoleJsonUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  roleCardForm.value.jsonFile = file;
+  
+  try {
+    const text = await file.text();
+    const jsonData = JSON.parse(text);
+    
+    const possibleNameFields = [
+      'name',
+      'char_name',
+      'data.name',
+      'character_name',
+    ];
+    
+    let extractedName = '';
+    
+    for (const field of possibleNameFields) {
+      if (field.includes('.')) {
+        const keys = field.split('.');
+        let value = jsonData;
+        for (const key of keys) {
+          value = value?.[key];
+          if (!value) break;
+        }
+        if (value && typeof value === 'string') {
+          extractedName = value;
+          break;
+        }
+      } else {
+        if (jsonData[field] && typeof jsonData[field] === 'string') {
+          extractedName = jsonData[field];
+          break;
+        }
+      }
+    }
+    
+    // 自动填充名称
+    if (extractedName && !roleCardForm.value.name) {
+      roleCardForm.value.name = extractedName.trim();
+    }
+    
+    // 提取描述但不自动填充
+    if (jsonData.description) {
+      extractedDescription.value = jsonData.description.trim();
+    } else if (jsonData.data?.description) {
+      extractedDescription.value = jsonData.data.description.trim();
+    }
+    
+  } catch (err) {
+    console.warn('JSON 解析失败:', err);
+  }
+};
+
+
           return {
             config,
             configB,
@@ -5156,6 +5398,10 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
             deleteCurrentAlbum,
             handleOpenHtml,
             openLink,
+            extractedDescription,     // 新增
+            fillDescription,   
+            handleRolePngUpload, 
+            handleRoleJsonUpload,
             setFilter: (f) => {
               filter.value = f;
               currentAlbum.value = null;
