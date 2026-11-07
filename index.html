@@ -52,6 +52,14 @@
     <!-- 引入 TUS 客户端用于大文件上传 -->
     <script src="https://cdn.jsdelivr.net/npm/tus-js-client@2.3.0/dist/tus.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/aws4fetch@1.0.19/dist/aws4fetch.umd.js"></script>
+<script>
+  // aws4fetch UMD 版会把 AwsClient 挂到全局
+  // 如果没有自动挂，手动提一下
+  if (typeof AwsClient === 'undefined' && window.aws4fetch) {
+    window.AwsClient = window.aws4fetch.AwsClient;
+  }
+</script>
     <link
       href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap"
       rel="stylesheet"
@@ -95,438 +103,925 @@
       };
     </script>
     <style>
-/* ═════════════════════════════════════════════════════════
-   主题 v7 — 6 套，每套改的"维度"不同，而不是换漆
-   改的地方：排版 / 文字 / 透明 / 手账 / 整页装饰
-   ═════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   MUSEUM HIGH-AESTHETIC THEMES — 6 套完全不同 UI 架构与排版维度的视觉系统
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── 0. Gallery ── */
+/* ── 全局基础过渡与字体变量 ── */
 :root {
-  --bg-main: #fcfcfc; --bg-panel: #ffffff;
-  --text-main: #0f0f0f; --text-sub: #888;
-  --border-color: #f0f0f0; --accent-color: #000;
+  --bg-main: #fafafa;
+  --bg-panel: #ffffff;
+  --text-main: #111111;
+  --text-sub: #888888;
+  --border-color: #efefef;
+  --accent-color: #111111;
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  --font-title: "Noto Serif SC", Georgia, serif;
 }
 
-/* ═══════ 1. ALBUM —— 改"排版方向" ═══════
-   卡片不再是纵向图+文，变成横向的"缩略图 | 信息"
-   ═══════════════════════════════════════════ */
-[data-theme="album"] {
-  --bg-main: #ffffff; --bg-panel: #ffffff;
-  --text-main: #1a1a1a; --text-sub: #8e8e93;
-  --border-color: transparent; --accent-color: #007aff;
+/* ═══════════════════════════════════════════════════════════════════════════
+   0. DEFAULT (Gallery) —— 100% 原版不动，搭载 18 张全量头像直链池
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg-main: #fcfcfc;
+  --bg-panel: #ffffff;
+  --text-main: #0f0f0f;
+  --text-sub: #888;
+  --border-color: #f0f0f0;
+  --accent-color: #000;
+
+  /* ── 18 张头像全量直链池 (第一批 6 张 + 第二批 12 张) ── */
+  --av-1: url("https://i.postimg.cc/8Fsz4c8q/com-xingin-xhs-20261108012508.png");
+  --av-2: url("https://i.postimg.cc/p97X6vRG/com-xingin-xhs-20261108012601.png");
+  --av-3: url("https://i.postimg.cc/CBqLy2xJ/com-xingin-xhs-20261108012613.png");
+  --av-4: url("https://i.postimg.cc/R6HVrY0v/com-xingin-xhs-20261108012620.png");
+  --av-5: url("https://i.postimg.cc/K3hcm5Kt/com-xingin-xhs-20261108012704.png");
+  --av-6: url("https://i.postimg.cc/xqLTtB7k/com-xingin-xhs-20261108012716.png");
+  --av-7: url("https://i.postimg.cc/RJTW8YP4/com-xingin-xhs-20261108013701.png");
+  --av-8: url("https://i.postimg.cc/RNM6fMFV/com-xingin-xhs-20261108013812.png");
+  --av-9: url("https://i.postimg.cc/D82Js2Z0/com-xingin-xhs-20261108013831.png");
+  --av-10: url("https://i.postimg.cc/56xYvx0j/com-xingin-xhs-20261108013846.png");
+  --av-11: url("https://i.postimg.cc/qzkhnkRR/com-xingin-xhs-20261108013851.png");
+  --av-12: url("https://i.postimg.cc/QHX95Xt7/com-xingin-xhs-20261108013857.png");
+  --av-13: url("https://i.postimg.cc/hXYfHT08/com-xingin-xhs-20261108013912.png");
+  --av-14: url("https://i.postimg.cc/zLRV5vdT/com-xingin-xhs-20261108013929.png");
+  --av-15: url("https://i.postimg.cc/XZyp3q28/com-xingin-xhs-20261108013936.png");
+  --av-16: url("https://i.postimg.cc/t1VYyJrN/com-xingin-xhs-20261108013952.png");
+  --av-17: url("https://i.postimg.cc/06JbxjtC/com-xingin-xhs-20261108014020.png");
+  --av-18: url("https://i.postimg.cc/5HF61yPk/com-xingin-xhs-20261108014028.png");
 }
-[data-theme="album"] body { background:#fff; }
-[data-theme="album"] main .columns-2,
-[data-theme="album"] main [class^="columns-"] {
+
+/* ── 18 头像通用轮播引擎（自动给各社交主题的 ::before 注入不同头像） ── */
+main .break-inside-avoid:nth-child(18n+1)  { --cur-av: var(--av-1); }
+main .break-inside-avoid:nth-child(18n+2)  { --cur-av: var(--av-2); }
+main .break-inside-avoid:nth-child(18n+3)  { --cur-av: var(--av-3); }
+main .break-inside-avoid:nth-child(18n+4)  { --cur-av: var(--av-4); }
+main .break-inside-avoid:nth-child(18n+5)  { --cur-av: var(--av-5); }
+main .break-inside-avoid:nth-child(18n+6)  { --cur-av: var(--av-6); }
+main .break-inside-avoid:nth-child(18n+7)  { --cur-av: var(--av-7); }
+main .break-inside-avoid:nth-child(18n+8)  { --cur-av: var(--av-8); }
+main .break-inside-avoid:nth-child(18n+9)  { --cur-av: var(--av-9); }
+main .break-inside-avoid:nth-child(18n+10) { --cur-av: var(--av-10); }
+main .break-inside-avoid:nth-child(18n+11) { --cur-av: var(--av-11); }
+main .break-inside-avoid:nth-child(18n+12) { --cur-av: var(--av-12); }
+main .break-inside-avoid:nth-child(18n+13) { --cur-av: var(--av-13); }
+main .break-inside-avoid:nth-child(18n+14) { --cur-av: var(--av-14); }
+main .break-inside-avoid:nth-child(18n+15) { --cur-av: var(--av-15); }
+main .break-inside-avoid:nth-child(18n+16) { --cur-av: var(--av-16); }
+main .break-inside-avoid:nth-child(18n+17) { --cur-av: var(--av-17); }
+main .break-inside-avoid:nth-child(18n+18) { --cur-av: var(--av-18); }
+
+
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1. WECHAT (朋友圈 · 18头像轮播 + 精致单图 + 原生微信双点互动图标)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="wechat"] {
+  --bg-main: #ededed;
+  --bg-panel: #ffffff;
+  --text-main: #191919;
+  --text-sub: #b2b2b2;
+  --border-color: #f0f0f0;
+  --accent-color: #576b95;
+}
+[data-theme="wechat"] body { background-color: #ededed; }
+[data-theme="wechat"] header {
+  max-width: 600px;
+  margin: 0 auto;
+  background: rgba(247, 247, 247, 0.94) !important;
+  backdrop-filter: blur(16px);
+  border-bottom: 0.5px solid #e0e0e0 !important;
+}
+[data-theme="wechat"] main {
+  max-width: 600px;
+  margin: 0 auto;
+  background: #ffffff;
+  min-height: 100vh;
+  padding: 0 !important;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.03);
+}
+[data-theme="wechat"] main > div[class*="columns-"] {
   columns: 1 !important;
-  max-width: 640px;
-  margin-left: auto;
-  margin-right: auto;
-}
-/* 卡片横排 */
-[data-theme="album"] main .break-inside-avoid {
   display: flex !important;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 8px;
+  flex-direction: column;
+  gap: 0 !important;
+}
+[data-theme="wechat"] main .break-inside-avoid {
   margin: 0 !important;
+  padding: 18px 18px 16px 72px !important;
   border: none !important;
-  border-bottom: 0.5px solid #e5e5ea !important;
+  border-bottom: 0.5px solid #f0f0f0 !important;
+  border-radius: 0 !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  position: relative;
+}
+[data-theme="wechat"] main .break-inside-avoid::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 18px;
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  background-image: var(--cur-av, var(--av-1));
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.08);
+}
+[data-theme="wechat"] main .break-inside-avoid::after {
+  content: "Museum Archiver";
+  position: absolute;
+  left: 72px;
+  top: 18px;
+  right: 18px;
+  height: calc(100% - 34px);
+  font-size: 15px;
+  font-weight: 600;
+  color: #576b95;
+  line-height: 1.2;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='20' viewBox='0 0 32 20'%3E%3Crect width='32' height='20' rx='4' fill='%23f7f7f7'/%3E%3Ccircle cx='12' cy='10' r='2' fill='%23576b95'/%3E%3Ccircle cx='20' cy='10' r='2' fill='%23576b95'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right bottom;
+}
+[data-theme="wechat"] main .break-inside-avoid > div:not([class*="absolute"]) {
+  margin-top: 24px !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+[data-theme="wechat"] main .break-inside-avoid div[class*="aspect-"],
+[data-theme="wechat"] main .break-inside-avoid .overflow-hidden.bg-gray-50\/50 {
+  max-width: 180px !important;
+  max-height: 220px !important;
+  width: fit-content !important;
+  aspect-ratio: auto !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  margin-top: 6px;
+}
+[data-theme="wechat"] main .break-inside-avoid img {
+  max-width: 180px !important;
+  max-height: 220px !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: cover !important;
+  border-radius: 4px !important;
+}
+[data-theme="wechat"] main .break-inside-avoid .p-4,
+[data-theme="wechat"] main .break-inside-avoid .mt-3.px-1 {
+  padding: 8px 42px 8px 10px !important;
+  background: #f7f7f7 !important;
+  border-radius: 4px !important;
+  margin-top: 10px !important;
+}
+[data-theme="wechat"] main .break-inside-avoid .p-6 { padding: 4px 0 24px 0 !important; }
+[data-theme="wechat"] main h3 {
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  color: #191919 !important;
+  font-family: -apple-system, "PingFang SC", sans-serif !important;
+}
+[data-theme="wechat"] main .border-t { border-top: none !important; padding-top: 2px !important; }
+[data-theme="wechat"] .tag-link { color: #576b95 !important; font-weight: 500; }
+[data-theme="wechat"] button[class*="fixed right-10"] {
+  background: #07c160 !important;
+  box-shadow: 0 4px 14px rgba(7, 193, 96, 0.4) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2. INSGRAM (Instagram · 原生矢量 SVG 互动栏 + 真实顶部头部 + 彩虹故事圈)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="insgram"] {
+  --bg-main: #fafafa;
+  --bg-panel: #ffffff;
+  --text-main: #121212;
+  --text-sub: #8e8e8e;
+  --border-color: #efefef;
+  --accent-color: #ff3040;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-title: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+[data-theme="insgram"] header {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid #dbdbdb !important;
+}
+[data-theme="insgram"] main > div[class*="columns-"] {
+  columns: unset !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 28px !important;
+  max-width: 1060px;
+  margin: 0 auto;
+  align-items: start;
+}
+[data-theme="insgram"] main .break-inside-avoid {
+  background: #ffffff !important;
+  border: 1px solid #dbdbdb !important;
+  border-radius: 12px !important;
+  padding: 54px 0 0 0 !important;
+  margin: 0 !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.02) !important;
+  position: relative;
+  overflow: hidden;
+}
+[data-theme="insgram"] main .break-inside-avoid::before {
+  content: "";
+  position: absolute;
+  top: 11px;
+  left: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background:
+    var(--cur-av, var(--av-1)) center/cover no-repeat padding-box,
+    linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888) border-box;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1.5px #ffffff;
+  z-index: 15;
+}
+[data-theme="insgram"] main .break-inside-avoid::after {
+  content: "museum.archive";
+  position: absolute;
+  top: 19px;
+  left: 56px;
+  right: 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #121212;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='%23262626'%3E%3Ccircle cx='5' cy='12' r='1.75'/%3E%3Ccircle cx='12' cy='12' r='1.75'/%3E%3Ccircle cx='19' cy='12' r='1.75'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
+}
+[data-theme="insgram"] main .break-inside-avoid > div:not([class*="absolute"]) {
+  border: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
   background: transparent !important;
 }
-[data-theme="album"] main .break-inside-avoid:hover {
-  background: #f7f7f8 !important;
-}
-/* 图片容器变 72 圆缩略图 */
-[data-theme="album"] main .break-inside-avoid > .aspect-square,
-[data-theme="album"] main .break-inside-avoid > div[class*="aspect-"],
-[data-theme="album"] main .break-inside-avoid .perspective-1000 {
-  flex: 0 0 72px;
-  width: 72px !important;
-  height: 72px !important;
-  aspect-ratio: 1/1 !important;
-  border-radius: 12px;
-  overflow: hidden;
-}
-[data-theme="album"] main img {
-  width: 100% !important;
-  height: 100% !important;
+[data-theme="insgram"] main img {
+  border-radius: 0 !important;
+  aspect-ratio: 4 / 4.2;
   object-fit: cover;
-  border-radius: 12px !important;
+  border-top: 1px solid #f5f5f5;
+  border-bottom: 1px solid #f5f5f5;
 }
-[data-theme="album"] main .break-inside-avoid > div[class*="p-4"] {
-  flex: 1;
-  padding: 0 !important;
-  background: transparent !important;
-}
-[data-theme="album"] button[class*="fixed right-10"] {
-  background: #007aff !important;
-  box-shadow: 0 4px 16px rgba(0,122,255,0.35) !important;
-}
-
-/* ═══════ 2. PAPER —— 改"文字整合" ═══════
-   不是卡片换肤，是把"图 + 字"整合成文件卡的样式：
-   图贴满、无圆角、文字像文件号、有横线可分
-   ═══════════════════════════════════════════ */
-[data-theme="paper"] {
-  --bg-main: #f4f1ea; --bg-panel: #ffffff;
-  --text-main: #2b2b2b; --text-sub: #8a8278;
-  --border-color: #e0d8c8; --accent-color: #8a7a5c;
-}
-[data-theme="paper"] body {
-  background-color: #f4f1ea;
+[data-theme="insgram"] main .break-inside-avoid .mt-3.px-1,
+[data-theme="insgram"] main .break-inside-avoid .p-4,
+[data-theme="insgram"] main .break-inside-avoid .p-6 {
+  padding: 46px 14px 14px 14px !important;
+  margin: 0 !important;
+  position: relative;
   background-image:
-    repeating-linear-gradient(0deg, transparent 0px, transparent 27px, rgba(0,0,0,0.03) 27px, rgba(0,0,0,0.03) 28px);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='104' height='24' viewBox='0 0 104 24' fill='none'%3E%3Cpath d='M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938Z' fill='%23ff3040' stroke='%23ff3040' stroke-width='1.8'/%3E%3Cpath d='M56.656 17.008a9.993 9.993 0 1 0-3.59 3.615L58 22Z' stroke='%23262626' stroke-width='1.8' stroke-linejoin='round'/%3E%3Cline x1='98' y1='3' x2='87.218' y2='10.083' stroke='%23262626' stroke-width='1.8' stroke-linejoin='round'/%3E%3Cpolygon points='89.698 20.334 98 3.001 78 3.001 87.218 10.084 89.698 20.334' stroke='%23262626' stroke-width='1.8' stroke-linejoin='round'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23262626' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='20 21 12 13.44 4 21 4 3 20 3 20 21'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, no-repeat;
+  background-position: 12px 12px, right 12px top 12px;
+  background-size: 96px 22px, 22px 22px;
 }
-[data-theme="paper"] main .break-inside-avoid {
-  background: #fff;
-  border: 1px solid #e0d8c8 !important;
-  border-radius: 0 !important;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
-  padding: 0;
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-[data-theme="paper"] main .break-inside-avoid:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important;
-}
-/* 图贴满无圆角 */
-[data-theme="paper"] main .break-inside-avoid > div[class*="aspect-"],
-[data-theme="paper"] main .break-inside-avoid > .aspect-square,
-[data-theme="paper"] main img {
-  border-radius: 0 !important;
-}
-/* 文字区变"文件号"——加一条横线、缩进、字号变小 */
-[data-theme="paper"] main .break-inside-avoid > div[class*="p-4"] {
-  padding: 12px 16px 14px !important;
-  border-top: 1px solid #e0d8c8;
-  background: #fff !important;
-}
-[data-theme="paper"] main .break-inside-avoid > div[class*="p-4"] h3 {
-  font-family: "Noto Serif SC", Georgia, serif !important;
+[data-theme="insgram"] main h3 {
   font-size: 13px !important;
-  letter-spacing: 0.02em;
-  line-height: 1.5;
+  font-weight: 600 !important;
+  color: #121212 !important;
+  line-height: 1.4 !important;
 }
-[data-theme="paper"] main .break-inside-avoid > div[class*="p-4"] > div:last-child {
-  border-top: 1px dashed #e0d8c8 !important;
-  padding-top: 8px;
-  margin-top: 8px;
-  font-size: 9px !important;
-  color: #8a8278 !important;
-}
-[data-theme="paper"] button[class*="fixed right-10"] {
-  background: #8a7a5c !important;
-  border-radius: 0 !important;
-  box-shadow: 2px 2px 0 rgba(138,122,92,0.35) !important;
-}
-
-/* ═══════ 3. GLASS —— 改"透明层" ═══════
-   磨砂玻璃，能看见后面渐变
-   ═══════════════════════════════════════════ */
-[data-theme="glass"] {
-  --bg-main: #edf0f5; --bg-panel: rgba(255,255,255,0.55);
-  --text-main: #2b3340; --text-sub: #7a8494;
-  --border-color: rgba(255,255,255,0.8); --accent-color: #5b8def;
-}
-[data-theme="glass"] body {
-  background: linear-gradient(135deg, #d9e4f5 0%, #e8ddf5 50%, #f5dfe8 100%);
-  background-attachment: fixed;
-}
-[data-theme="glass"] main .break-inside-avoid {
-  background: rgba(255,255,255,0.45) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.8) !important;
-  border-radius: 16px !important;
-  box-shadow:
-    0 4px 20px rgba(90,120,180,0.1),
-    inset 0 1px 0 rgba(255,255,255,0.9) !important;
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-[data-theme="glass"] main .break-inside-avoid:hover {
-  transform: translateY(-3px);
-  box-shadow:
-    0 12px 32px rgba(90,120,180,0.18),
-    inset 0 1px 0 rgba(255,255,255,0.9) !important;
-}
-[data-theme="glass"] main img {
-  border-radius: 16px 16px 0 0 !important;
-}
-[data-theme="glass"] main .break-inside-avoid > div[class*="p-4"] {
-  background: rgba(255,255,255,0.5) !important;
-  backdrop-filter: blur(12px);
-}
-[data-theme="glass"] button[class*="fixed right-10"] {
-  background: rgba(91,141,239,0.9) !important;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 24px rgba(91,141,239,0.4) !important;
-}
-
-/* ═══════ 4. STICKER —— 改"手账装饰"（去粉，变米） ═══════
-   不粉了：米色胶带、暖灰投影、手绘歪
-   ═══════════════════════════════════════════ */
-[data-theme="sticker"] {
-  --bg-main: #fbf7f0; --bg-panel: #ffffff;
-  --text-main: #38312a; --text-sub: #9e9184;
-  --border-color: transparent; --accent-color: #b89b7a;
-}
-[data-theme="sticker"] body {
-  background-color: #fbf7f0;
-  background-image:
-    radial-gradient(circle at 15% 20%, rgba(184,155,122,0.06) 0%, transparent 35%),
-    radial-gradient(circle at 85% 80%, rgba(184,155,122,0.06) 0%, transparent 35%);
-  background-attachment: fixed;
-}
-[data-theme="sticker"] main .break-inside-avoid {
-  background: #fff;
-  border: none !important;
-  border-radius: 14px !important;
-  padding: 8px;
-  box-shadow:
-    0 3px 0 #e8dcc8,
-    0 8px 20px rgba(56,49,42,0.06) !important;
-  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s;
-  position: relative;
-}
-[data-theme="sticker"] main .break-inside-avoid:nth-child(3n+1) { transform: rotate(-1.1deg); }
-[data-theme="sticker"] main .break-inside-avoid:nth-child(3n+2) { transform: rotate(0.7deg); }
-[data-theme="sticker"] main .break-inside-avoid:nth-child(3n)   { transform: rotate(-0.4deg); }
-[data-theme="sticker"] main .break-inside-avoid:hover {
-  transform: rotate(0) translateY(-4px) scale(1.015) !important;
-  box-shadow:
-    0 6px 0 #e8dcc8,
-    0 14px 28px rgba(56,49,42,0.1) !important;
-  z-index: 10;
-}
-/* 米色半透明胶带 */
-[data-theme="sticker"] main .break-inside-avoid::before {
-  content: ""; position: absolute; top: -7px; left: 50%;
-  transform: translateX(-50%) rotate(-3deg);
-  width: 46px; height: 13px;
-  background: rgba(232,220,200,0.75);
-  border: 1px solid rgba(200,180,150,0.35);
-  border-radius: 1px;
-  z-index: 20;
-}
-[data-theme="sticker"] main img { border-radius: 10px !important; }
-[data-theme="sticker"] button[class*="fixed right-10"] {
-  background: #b89b7a !important;
-  box-shadow: 0 4px 14px rgba(184,155,122,0.4) !important;
-}
-
-/* ═══════ 5. CLOTH —— 改"整页装饰" ═══════
-   不是卡片换肤，是整张 app 换物种：顶栏布缝 + 卡片凹陷
-   ═══════════════════════════════════════════ */
-[data-theme="cloth"] {
-  --bg-main: #e7ebe1; --bg-panel: #f2f5ec;
-  --text-main: #3a4232; --text-sub: #86907c;
-  --border-color: transparent; --accent-color: #7a8f6e;
-}
-[data-theme="cloth"] body {
-  background-color: #e7ebe1;
-  background-image:
-    repeating-linear-gradient(45deg, rgba(122,143,110,0.04) 0px, rgba(122,143,110,0.04) 1px, transparent 1px, transparent 4px),
-    repeating-linear-gradient(-45deg, rgba(122,143,110,0.04) 0px, rgba(122,143,110,0.04) 1px, transparent 1px, transparent 4px);
-}
-/* 顶栏改布缝——加虚线底线 */
-[data-theme="cloth"] header {
-  border-bottom: 2px dashed rgba(122,143,110,0.35) !important;
-  background: rgba(242,245,236,0.85) !important;
-  backdrop-filter: blur(10px);
-}
-/* 卡片是"布贴"——内填色，凹陷感，hover 按进去 */
-[data-theme="cloth"] main .break-inside-avoid {
-  border: none !important;
-  border-radius: 20px !important;
-  background: #f2f5ec;
-  box-shadow:
-    inset 0 2px 4px rgba(122,143,110,0.12),
-    inset 0 -1px 0 rgba(255,255,255,0.7),
-    0 2px 8px rgba(122,143,110,0.08) !important;
-  transition: box-shadow 0.25s, transform 0.25s;
-}
-[data-theme="cloth"] main .break-inside-avoid:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 3px 8px rgba(122,143,110,0.16),
-    inset 0 -1px 0 rgba(255,255,255,0.7),
-    0 2px 4px rgba(122,143,110,0.06) !important;
-}
-[data-theme="cloth"] main img {
-  border-radius: 16px 16px 0 0 !important;
-  filter: saturate(0.85) contrast(0.98);
-}
-[data-theme="cloth"] button[class*="fixed right-10"] {
-  background: #7a8f6e !important;
-  border-radius: 20px !important;
-  box-shadow:
-    inset 0 2px 4px rgba(0,0,0,0.15),
-    inset 0 -1px 0 rgba(255,255,255,0.2),
-    0 4px 14px rgba(122,143,110,0.35) !important;
-}
-[data-theme="polaroid"] {
-  --bg-main: #eef2f2;
-  --bg-panel: #ffffff;
-  --text-main: #2b3a3a;
-  --text-sub: #8fa0a0;
-  --border-color: transparent;
-  --accent-color: #4a8b8b;
-}
-[data-theme="polaroid"] body {
-  background-color: #eef2f2;
-  background-image:
-    radial-gradient(circle at 20% 30%, rgba(74,139,139,0.06) 0%, transparent 45%),
-    radial-gradient(circle at 80% 70%, rgba(120,150,180,0.06) 0%, transparent 45%);
-  background-attachment: fixed;
-}
-
-/* 卡片 = 拍立得相纸 */
-[data-theme="polaroid"] main .break-inside-avoid {
-  background: #ffffff !important;
-  border: none !important;
-  border-radius: 3px !important;
-  padding: 10px 10px 0 10px !important;
-  box-shadow:
-    0 1px 3px rgba(40,60,60,0.1),
-    0 6px 18px rgba(40,60,60,0.08) !important;
-  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s;
-  position: relative;
-}
-/* 微微歪 */
-[data-theme="polaroid"] main .break-inside-avoid:nth-child(3n+1) { transform: rotate(-1.2deg); }
-[data-theme="polaroid"] main .break-inside-avoid:nth-child(3n+2) { transform: rotate(0.9deg); }
-[data-theme="polaroid"] main .break-inside-avoid:nth-child(3n)   { transform: rotate(-0.4deg); }
-[data-theme="polaroid"] main .break-inside-avoid:hover {
-  transform: rotate(0) translateY(-4px) !important;
-  box-shadow:
-    0 4px 10px rgba(40,60,60,0.15),
-    0 18px 40px rgba(40,60,60,0.15) !important;
-  z-index: 10;
-}
-
-/* 图片：上边缘留相纸白边 (已由 padding 处理)，下边留白写字 */
-[data-theme="polaroid"] main .break-inside-avoid > div[class*="aspect-"],
-[data-theme="polaroid"] main .break-inside-avoid > .aspect-square {
-  border-radius: 1px !important;
-  overflow: hidden;
-}
-[data-theme="polaroid"] main img {
-  border-radius: 0 !important;
-  /* 照片色，稍微鲜一点 */
-  filter: saturate(1.05) contrast(1.02);
-}
-
-/* 底部信息区 = 手写相纸标签 */
-[data-theme="polaroid"] main .break-inside-avoid > div[class*="p-4"] {
-  background: #fff !important;
-  padding: 14px 4px 18px 4px !important;
-  border: none !important;
-}
-[data-theme="polaroid"] main .break-inside-avoid > div[class*="p-4"] h3 {
-  font-family: "Noto Serif SC", "Kaiti SC", Georgia, serif !important;
-  font-size: 12px !important;
-  font-weight: 400 !important;
-  letter-spacing: 0.08em;
-  color: #2b3a3a !important;
-  text-align: center;
-  margin-bottom: 6px;
-}
-/* 标签和日期居中，变小 */
-[data-theme="polaroid"] main .break-inside-avoid > div[class*="p-4"] > div {
-  justify-content: center !important;
+[data-theme="insgram"] main .border-t {
   border-top: none !important;
-  padding-top: 0 !important;
+  padding-top: 4px !important;
   margin-top: 4px !important;
 }
-[data-theme="polaroid"] main .break-inside-avoid > div[class*="p-4"] > div span {
-  text-align: center;
-  font-size: 9px !important;
-  color: #8fa0a0 !important;
+[data-theme="insgram"] .tag-link {
+  color: #00376b !important;
+  font-size: 11px !important;
+  text-transform: lowercase !important;
+}
+[data-theme="insgram"] button[class*="fixed right-10"] {
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%) !important;
+  box-shadow: 0 6px 20px rgba(220, 39, 67, 0.35) !important;
 }
 
-/* 悬浮上传按钮：浅青 */
-[data-theme="polaroid"] button[class*="fixed right-10"] {
-  background: #4a8b8b !important;
-  border-radius: 50%;
-  box-shadow: 0 4px 16px rgba(74,139,139,0.4) !important;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3. NOTION (【彻底重构】Notion 画廊看板视图 Database Gallery View)
+   核心优势：不再压扁成单行！保留完整高清预览图 + 颜色圆点切换 + Notion 属性行排布
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="notion"] {
+  --bg-main: #ffffff;
+  --bg-panel: #ffffff;
+  --text-main: #37352f;
+  --text-sub: #787774;
+  --border-color: #e9e9e7;
+  --accent-color: #2383e2;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-title: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+[data-theme="notion"] header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e9e9e7 !important;
+}
+[data-theme="notion"] header h1 {
+  font-family: -apple-system, sans-serif !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em !important;
+  font-size: 16px !important;
+}
+[data-theme="notion"] header h1::before {
+  content: "📖 ";
+}
+/* 顶部自动生成 Notion 数据库的视图切换工具栏 (Gallery View | Properties | Filter | Sort) */
+[data-theme="notion"] main > div[class*="columns-"] {
+  columns: unset !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px !important;
+  max-width: 1440px;
+  margin: 8px auto 0;
+  padding-top: 48px !important;
+  position: relative;
+  align-items: start;
+}
+[data-theme="notion"] main > div[class*="columns-"]::before {
+  content: "⊞  Gallery View     ·     ☷  All Archives                                                                   Filter    ⇅ Sort    🔍";
+  white-space: pre;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  line-height: 36px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #37352f;
+  border-bottom: 1px solid #e9e9e7;
+}
+/* Notion Gallery 卡片外壳：细灰框 + 微圆角 + 悬浮轻阴影 + 100%保留内部配色圆点和按钮！ */
+[data-theme="notion"] main .break-inside-avoid {
+  margin: 0 !important;
+  background: #ffffff !important;
+  border: 1px solid #e9e9e7 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 1px 3px rgba(15, 15, 15, 0.04) !important;
+  overflow: hidden !important;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+[data-theme="notion"] main .break-inside-avoid:hover {
+  background: #fbfbfa !important;
+  box-shadow: 0 4px 12px rgba(15, 15, 15, 0.08) !important;
+}
+[data-theme="notion"] main .break-inside-avoid > div:not([class*="absolute"]) {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+/* 卡片上半部分：Notion Page Cover 预览图区（美化预览图和角色卡完整清晰展示！） */
+[data-theme="notion"] main .break-inside-avoid div[class*="aspect-"],
+[data-theme="notion"] main .break-inside-avoid .overflow-hidden.bg-gray-50\/50 {
+  border-radius: 0 !important;
+  border-bottom: 1px solid #f1f1ef !important;
+  background: #f7f6f3 !important;
+  max-height: 280px;
+}
+[data-theme="notion"] main img {
+  border-radius: 0 !important;
+  max-height: 280px;
+  object-fit: cover;
+}
+/* 卡片下半部分：Notion Properties 属性列表区 */
+[data-theme="notion"] main .break-inside-avoid .p-4,
+[data-theme="notion"] main .break-inside-avoid .mt-3.px-1 {
+  padding: 12px 14px !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+/* 标题前自动加 Notion 页面📄小图标 */
+[data-theme="notion"] main h3 {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: #37352f !important;
+  font-family: -apple-system, sans-serif !important;
+  margin-bottom: 8px !important;
+}
+[data-theme="notion"] main h3::before {
+  content: "📄 ";
+  font-size: 12px;
+}
+/* 美化卡片的颜色切换圆点区：加上 Notion 属性前缀 "🎨 Variants" */
+[data-theme="notion"] main .break-inside-avoid .flex.items-center.gap-3.mb-3 {
+  padding: 6px 8px;
+  background: #f7f7f5;
+  border-radius: 6px;
+  margin-bottom: 8px !important;
+}
+[data-theme="notion"] main .break-inside-avoid .flex.items-center.gap-3.mb-3::before {
+  content: "🎨 配色:";
+  font-size: 10px;
+  color: #787774;
+  margin-right: 4px;
+}
+[data-theme="notion"] main .border-t {
+  border-top: 1px solid #f1f1ef !important;
+  padding-top: 8px !important;
+  margin-top: 6px !important;
+}
+/* Notion 经典彩色多选 Tag 胶囊 */
+[data-theme="notion"] .tag-link {
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10.5px !important;
+  font-weight: 500;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  text-decoration: none !important;
+}
+[data-theme="notion"] main .break-inside-avoid:nth-child(5n+1) .tag-link { background: #fdecc8; color: #49290e !important; }
+[data-theme="notion"] main .break-inside-avoid:nth-child(5n+2) .tag-link { background: #d3e5ef; color: #183347 !important; }
+[data-theme="notion"] main .break-inside-avoid:nth-child(5n+3) .tag-link { background: #f5e0e9; color: #4c2337 !important; }
+[data-theme="notion"] main .break-inside-avoid:nth-child(5n+4) .tag-link { background: #dbeddb; color: #1c3829 !important; }
+[data-theme="notion"] main .break-inside-avoid:nth-child(5n+5) .tag-link { background: #e8deee; color: #412454 !important; }
+[data-theme="notion"] button[class*="fixed right-10"] {
+  background: #2383e2 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 14px rgba(35, 131, 226, 0.35) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4. BAZAAR (Vogue 时尚画报 · 典藏衬框 + 黄金比例留白 + 双线斜体展签)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="bazaar"] {
+  --bg-main: #f4f0ea;
+  --bg-panel: #fbf9f5;
+  --text-main: #161514;
+  --text-sub: #7a7267;
+  --border-color: #d8cfc2;
+  --accent-color: #8c1d1d;
+  --font: "Noto Serif SC", Georgia, serif;
+  --font-title: "Noto Serif SC", "Didot", Georgia, serif;
+}
+[data-theme="bazaar"] body {
+  background-color: #f4f0ea;
+  background-image: radial-gradient(rgba(22, 21, 20, 0.035) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+[data-theme="bazaar"] header {
+  background: rgba(244, 240, 234, 0.95) !important;
+  border-top: 3px solid #161514;
+  border-bottom: 4px double #161514 !important;
+  margin-top: 6px;
+}
+[data-theme="bazaar"] header h1 {
+  letter-spacing: 0.45em !important;
+  font-weight: 700 !important;
+  font-size: 22px !important;
+}
+@media (min-width: 1024px) {
+  [data-theme="bazaar"] main > div[class*="columns-"] {
+    columns: 3 !important;
+    gap: 44px !important;
+    padding: 20px 32px !important;
+    max-width: 1560px;
+  }
+}
+[data-theme="bazaar"] main .break-inside-avoid {
+  background: #fbf9f5 !important;
+  border: 1px solid #161514 !important;
+  border-radius: 0 !important;
+  padding: 22px 22px 24px 22px !important;
+  margin-bottom: 44px !important;
+  box-shadow: 0 12px 30px rgba(22, 21, 20, 0.06), 6px 6px 0px #e6dfd3 !important;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease !important;
+  counter-increment: bazaar-no;
+  position: relative;
+}
+[data-theme="bazaar"] main .break-inside-avoid::before {
+  content: " — PLATE NO. " counter(bazaar-no, decimal-leading-zero) " — ";
+  display: block;
+  font-family: Georgia, "Noto Serif SC", serif;
+  font-style: italic;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: #8c1d1d;
+  margin-bottom: 14px;
+  text-align: center;
+}
+[data-theme="bazaar"] main .break-inside-avoid:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px rgba(22, 21, 20, 0.1), 8px 8px 0px #161514 !important;
+}
+[data-theme="bazaar"] main .break-inside-avoid * { border-radius: 0 !important; }
+[data-theme="bazaar"] main .break-inside-avoid > div {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+[data-theme="bazaar"] main img {
+  border: 1px solid #161514 !important;
+  padding: 8px;
+  background: #ffffff;
+  filter: contrast(1.03) sepia(0.05);
+}
+[data-theme="bazaar"] main h3 {
+  text-align: center;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.12em;
+  margin-top: 14px !important;
+  padding-bottom: 10px;
+  border-bottom: 3px double #d8cfc2;
+  color: #161514 !important;
+}
+[data-theme="bazaar"] button[class*="fixed right-10"] {
+  background: #8c1d1d !important;
+  border: 1px solid #161514 !important;
+  border-radius: 0 !important;
+  box-shadow: 3px 3px 0 #161514 !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5. KAKAO (KakaoTalk · 底部悬浮胶囊 Dock + 18真头像气泡 + 已读1)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="kakao"] {
+  --bg-main: #bacee0;
+  --bg-panel: #ffffff;
+  --text-main: #1e1e1e;
+  --text-sub: #7a8ba0;
+  --border-color: transparent;
+  --accent-color: #fee500;
+}
+[data-theme="kakao"] body { background-color: #bacee0; padding-bottom: 96px; }
+[data-theme="kakao"] header {
+  position: fixed !important;
+  top: auto !important;
+  bottom: 16px !important;
+  left: 50% !important;
+  transform: translateX(-50%);
+  width: calc(100% - 28px);
+  max-width: 860px;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px);
+  border-radius: 999px !important;
+  border: none !important;
+  box-shadow: 0 10px 32px rgba(28, 48, 74, 0.18) !important;
+  z-index: 90;
+}
+[data-theme="kakao"] header > div { padding: 10px 24px !important; }
+[data-theme="kakao"] header nav button.font-bold {
+  background: #fee500;
+  color: #191919 !important;
+  padding: 4px 12px;
+  border-radius: 99px;
+}
+[data-theme="kakao"] header nav button.font-bold span { display: none; }
+[data-theme="kakao"] main .break-inside-avoid {
+  background: #ffffff !important;
+  border-radius: 3px 20px 20px 20px !important;
+  padding: 10px !important;
+  margin-left: 46px !important;
+  border: none !important;
+  box-shadow: 0 2px 6px rgba(35, 55, 80, 0.08) !important;
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+[data-theme="kakao"] main .break-inside-avoid::before {
+  content: "";
+  position: absolute;
+  left: -46px;
+  top: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 14px;
+  background-image: var(--cur-av, var(--av-1));
+  background-size: cover;
+  border: 1.5px solid rgba(255,255,255,0.8);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+[data-theme="kakao"] main .break-inside-avoid:nth-child(3n) {
+  background: #fee500 !important;
+  border-radius: 20px 3px 20px 20px !important;
+}
+[data-theme="kakao"] main .break-inside-avoid::after {
+  content: "1";
+  position: absolute;
+  bottom: 6px;
+  right: -12px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fee500;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.28);
+}
+[data-theme="kakao"] main .break-inside-avoid:hover { transform: translateY(-3px); }
+[data-theme="kakao"] main .break-inside-avoid > div {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+[data-theme="kakao"] main img { border-radius: 14px !important; }
+[data-theme="kakao"] button[class*="fixed right-10"] {
+  bottom: 90px !important;
+  background: #fee500 !important;
+  color: #191919 !important;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6. REDBOOK (小红书 · 18真头像左下角标 + 原生矢量实心小红心 SVG)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="redbook"] {
+  --bg-main: #f6f6f6;
+  --bg-panel: #ffffff;
+  --text-main: #222222;
+  --text-sub: #999999;
+  --border-color: transparent;
+  --accent-color: #ff2442;
+}
+[data-theme="redbook"] header {
+  background: #ffffff !important;
+  border-bottom: 0.5px solid #f0f0f0 !important;
+}
+[data-theme="redbook"] header nav button.font-bold {
+  background: #ff2442;
+  color: #ffffff !important;
+  padding: 4px 12px;
+  border-radius: 99px;
+}
+[data-theme="redbook"] header nav button.font-bold span { display: none; }
+[data-theme="redbook"] main > div[class*="columns-"] { gap: 14px !important; }
+[data-theme="redbook"] main .break-inside-avoid {
+  background: #ffffff !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  border: none !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03) !important;
+  margin-bottom: 14px !important;
+  padding-bottom: 36px !important;
+  position: relative;
+}
+[data-theme="redbook"] main .break-inside-avoid > div {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+[data-theme="redbook"] main img { border-radius: 12px 12px 0 0 !important; }
+[data-theme="redbook"] main .break-inside-avoid .mt-3.px-1,
+[data-theme="redbook"] main .break-inside-avoid .p-4 {
+  padding: 10px 12px 4px 12px !important;
+  margin: 0 !important;
+}
+[data-theme="redbook"] main h3 {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  font-family: -apple-system, "PingFang SC", sans-serif !important;
+}
+[data-theme="redbook"] main .break-inside-avoid::before {
+  content: "";
+  position: absolute;
+  bottom: 9px;
+  left: 12px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-image: var(--cur-av, var(--av-1));
+  background-size: cover;
+  border: 1px solid #f0f0f0;
+  z-index: 10;
+}
+[data-theme="redbook"] main .break-inside-avoid::after {
+  content: "MUSEUM";
+  position: absolute;
+  bottom: 11px;
+  left: 38px;
+  right: 12px;
+  font-size: 11px;
+  color: #666;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='14' viewBox='0 0 42 14'%3E%3Cpath d='M7 2.3C5.5.8 3 1 1.6 2.6.2 4.2.3 6.7 1.8 8.2L7 13l5.2-4.8c1.5-1.5 1.6-4 .2-5.6C11 1 8.5.8 7 2.3Z' fill='%23ff2442'/%3E%3Ctext x='17' y='11' font-family='sans-serif' font-size='10' fill='%23666'%3E99+%3C/text%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
+}
+[data-theme="redbook"] button[class*="fixed right-10"] {
+  background: #ff2442 !important;
+  width: 50px !important;
+  height: 36px !important;
+  border-radius: 99px !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7. X-STREAM (【已修复大图与灰边】Twitter / X 暗黑推文流)
+   修复核心：强制抹除容器固定比例与灰底，图片严格锁定在 220x260 精致圆角预览尺寸！
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="xstream"] {
+  --bg-main: #000000;
+  --bg-panel: #000000;
+  --text-main: #e7e9ea;
+  --text-sub: #71767b;
+  --border-color: #2f3336;
+  --accent-color: #1d9bf0;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-title: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+[data-theme="xstream"] body { background-color: #000000; }
+[data-theme="xstream"] header {
+  max-width: 600px;
+  margin: 0 auto;
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid #2f3336 !important;
+  border-left: 1px solid #2f3336;
+  border-right: 1px solid #2f3336;
+}
+[data-theme="xstream"] main {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 !important;
+  border-left: 1px solid #2f3336;
+  border-right: 1px solid #2f3336;
+  min-height: 100vh;
+}
+[data-theme="xstream"] main > div[class*="columns-"] {
+  columns: 1 !important;
+  display: flex !important;
+  flex-direction: column;
+  gap: 0 !important;
+}
+[data-theme="xstream"] main .break-inside-avoid {
+  margin: 0 !important;
+  padding: 16px 16px 42px 68px !important;
+  border: none !important;
+  border-bottom: 1px solid #2f3336 !important;
+  border-radius: 0 !important;
+  background: #000000 !important;
+  box-shadow: none !important;
+  position: relative;
+}
+[data-theme="xstream"] main .break-inside-avoid:hover {
+  background: #080808 !important;
+}
+[data-theme="xstream"] main .break-inside-avoid::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-image: var(--cur-av, var(--av-1));
+  background-size: cover;
+  z-index: 10;
+}
+[data-theme="xstream"] main .break-inside-avoid::after {
+  content: "MUSEUM  @museum_archive · 1h";
+  position: absolute;
+  left: 68px;
+  top: 16px;
+  right: 16px;
+  bottom: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #e7e9ea;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='18' viewBox='0 0 280 18' fill='none' stroke='%2371767b' stroke-width='1.5'%3E%3Cpath d='M7 14.5c-3.3 0-6-2.5-6-5.5S3.7 3.5 7 3.5s6 2.5 6 5.5c0 1.2-.4 2.3-1.2 3.2L13 15l-3.2-.8c-.8.2-1.8.3-2.8.3Z'/%3E%3Cpath d='M78 5h8v5M86 5l-3-3M84 13h-8V8M76 13l3 3'/%3E%3Cpath d='M154 4.5c1.5-1.5 4-1.3 5.2.3 1.2 1.6 1.1 4-.3 5.4L154 15l-4.9-4.8c-1.4-1.4-1.5-3.8-.3-5.4 1.2-1.6 3.7-1.8 5.2-.3Z'/%3E%3Cpath d='M222 15V8M227 15V4M232 15v-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left bottom;
+}
+[data-theme="xstream"] main .break-inside-avoid > div:not([class*="absolute"]) {
+  margin-top: 24px !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+/* 【核心修复】：彻底清除角色卡/美化卡的 bg-gray-50 灰底和固定宽高比，锁死在精致预览图尺寸！ */
+[data-theme="xstream"] main .break-inside-avoid div[class*="aspect-"],
+[data-theme="xstream"] main .break-inside-avoid .overflow-hidden.bg-gray-50\/50,
+[data-theme="xstream"] main .break-inside-avoid .bg-gray-50 {
+  max-width: 220px !important;
+  max-height: 260px !important;
+  width: fit-content !important;
+  aspect-ratio: auto !important;
+  background: transparent !important;
+  border-radius: 14px !important;
+  margin-top: 8px;
+}
+[data-theme="xstream"] main .break-inside-avoid img {
+  max-width: 220px !important;
+  max-height: 260px !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: cover !important;
+  border-radius: 14px !important;
+  border: 1px solid #2f3336 !important;
+  display: block;
+}
+[data-theme="xstream"] main .break-inside-avoid .p-4,
+[data-theme="xstream"] main .break-inside-avoid .mt-3.px-1,
+[data-theme="xstream"] main .break-inside-avoid .p-6 {
+  padding: 8px 0 0 0 !important;
+  background: transparent !important;
+}
+[data-theme="xstream"] main .border-t { border-top: none !important; }
+[data-theme="xstream"] .tag-link { color: #1d9bf0 !important; }
+[data-theme="xstream"] .bg-white,
+[data-theme="xstream"] .bg-gray-50,
+[data-theme="xstream"] .bg-gray-100 {
+  background-color: #16181c !important;
+  color: #e7e9ea !important;
+  border-color: #2f3336 !important;
+}
+[data-theme="xstream"] input,
+[data-theme="xstream"] textarea { color: #e7e9ea !important; }
+[data-theme="xstream"] button[class*="fixed right-10"] {
+  background: #1d9bf0 !important;
+  box-shadow: 0 4px 18px rgba(29, 155, 240, 0.4) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   8. NIGHTFALL (【新增】正常夜间模式 · 5列全功能丝滑瀑布流 + 护眼深邃暗石板色)
+   设计定位：没有任何社交伪元素的纯净夜间画廊，无灰边、全功能、极度舒适护眼
+   ═══════════════════════════════════════════════════════════════════════════ */
 [data-theme="nightfall"] {
-  --bg-main: #16181d;
-  --bg-panel: #1e2128;
-  --text-main: #d8dce4;
-  --text-sub: #7c8595;
-  --border-color: #2a2e37;
-  --accent-color: #a8b8d8;
+  --bg-main: #111318;
+  --bg-panel: #1a1d24;
+  --text-main: #e2e6f0;
+  --text-sub: #7e879b;
+  --border-color: #282c37;
+  --accent-color: #8ab4f8;
 }
 [data-theme="nightfall"] body {
-  background: #16181d;
+  background-color: #111318;
   background-image:
-    radial-gradient(ellipse at top, rgba(60,70,95,0.25) 0%, transparent 60%),
-    radial-gradient(ellipse at bottom, rgba(40,45,60,0.3) 0%, transparent 60%);
+    radial-gradient(ellipse at top, rgba(50, 62, 88, 0.22) 0%, transparent 65%);
   background-attachment: fixed;
 }
-
-/* 卡片 */
-[data-theme="nightfall"] main .break-inside-avoid {
-  background: #1e2128 !important;
-  border: 1px solid #2a2e37 !important;
-  border-radius: 10px !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
-  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+[data-theme="nightfall"] header {
+  background: rgba(17, 19, 24, 0.88) !important;
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid #232730 !important;
 }
-[data-theme="nightfall"] main .break-inside-avoid:hover {
-  transform: translateY(-2px);
-  border-color: #3d4350 !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
+[data-theme="nightfall"] header nav button.font-bold span {
+  background-color: #8ab4f8 !important;
+}
+/* 保持原版 5 列瀑布流，卡片润泽深灰，绝不漏白边 */
+[data-theme="nightfall"] main .break-inside-avoid > div:not([class*="absolute"]) {
+  background-color: #1a1d24 !important;
+  border-color: #282c37 !important;
+}
+[data-theme="nightfall"] main .break-inside-avoid div[class*="aspect-"],
+[data-theme="nightfall"] main .break-inside-avoid .overflow-hidden.bg-gray-50\/50 {
+  background-color: #14161c !important;
 }
 [data-theme="nightfall"] main img {
-  border-radius: 10px 10px 0 0 !important;
-  /* 夜间给图片一点点冷调，防刺眼 */
-  filter: brightness(0.92) contrast(0.98);
+  filter: brightness(0.94) contrast(1.02);
+  transition: filter 0.35s ease, transform 0.5s ease;
 }
 [data-theme="nightfall"] main .break-inside-avoid:hover img {
-  filter: brightness(1) contrast(1);
+  filter: brightness(1.02) contrast(1.02);
 }
-
-/* 暗色控件适配 */
+/* 全面消除夜间模式下的刺眼白底/灰底控件 */
+[data-theme="nightfall"] .bg-white,
 [data-theme="nightfall"] .bg-gray-50,
-[data-theme="nightfall"] .bg-gray-100,
-[data-theme="nightfall"] .bg-white {
-  background-color: #1e2128 !important;
-  color: #d8dce4 !important;
+[data-theme="nightfall"] .bg-gray-100 {
+  background-color: #222630 !important;
+  color: #e2e6f0 !important;
+  border-color: #323746 !important;
 }
-[data-theme="nightfall"] input[type="text"],
-[data-theme="nightfall"] input[type="password"],
-[data-theme="nightfall"] input[type="email"],
-[data-theme="nightfall"] textarea {
-  background-color: #262a33 !important;
-  color: #d8dce4 !important;
-  border-color: #343a46 !important;
+[data-theme="nightfall"] input,
+[data-theme="nightfall"] textarea,
+[data-theme="nightfall"] select {
+  background-color: #16181f !important;
+  color: #e2e6f0 !important;
+  border-color: #2e3340 !important;
 }
 [data-theme="nightfall"] input::placeholder,
 [data-theme="nightfall"] textarea::placeholder {
-  color: #5c6575 !important;
+  color: #636b7e !important;
 }
-
-/* 悬浮上传按钮：柔和冷青 */
+[data-theme="nightfall"] .color-dot.active {
+  box-shadow: 0 0 0 2px #1a1d24, 0 0 0 3.5px #8ab4f8 !important;
+}
 [data-theme="nightfall"] button[class*="fixed right-10"] {
-  background: #3a4560 !important;
-  box-shadow: 0 4px 20px rgba(58,69,96,0.6) !important;
+  background: #3b465e !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5) !important;
 }
 [data-theme="nightfall"] button[class*="fixed right-10"]:hover {
-  background: #47536e !important;
+  background: #4a5775 !important;
 }
 
-/* 顶栏 */
-[data-theme="nightfall"] header {
-  background: rgba(30,33,40,0.85) !important;
-  border-bottom: 1px solid #2a2e37 !important;
-}
-
-/* ═══════ 全局 ═══════ */
+/* ═══════ 全局基础 ═══════ */
 body {
   background-color: var(--bg-main);
   color: var(--text-main);
@@ -537,6 +1032,8 @@ body {
   transition: background-color 0.35s ease, color 0.35s ease;
 }
 h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif); }
+
+
 
       header {
         padding-top: env(safe-area-inset-top);
@@ -683,9 +1180,9 @@ h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif)
       class="min-h-screen flex flex-col font-sans selection:bg-black selection:text-white"
     >
       <!-- 1. 登录层 (高级冷淡风 / 固定URL版) -->
-      <div
-        v-if="!session"
-        class="fixed inset-0 z-[100] flex flex-col items-center justify-center p-8 transition-all duration-1000"
+<div
+  v-if="!session"
+  class="fixed inset-0 z-[100] flex flex-col items-center p-8 transition-all duration-1000 overflow-y-auto no-scroll"
         style="
           background-image: url(&quot;https://i.postimg.cc/k4G0JmTV/com-xingin-xhs-20260213125939.jpg&quot;);
           background-size: cover;
@@ -693,12 +1190,14 @@ h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif)
         "
       >
         <!-- 1. 加强版遮罩：由原来的 white/10 改为 white/30，防止背景太花看不清字 -->
-        <div class="absolute inset-0 bg-white/30 backdrop-blur-sm"></div>
+        <div class="fixed inset-0 bg-white/30 backdrop-blur-sm"></div>
 
         <!-- 2. 玻璃卡片：高强度磨砂 + 锐利直角 -->
-        <div
-          class="relative w-full max-w-[340px] bg-white/40 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] p-12 animate-fade-in flex flex-col items-center border border-white/60"
-        >
+<div
+  class="relative w-full max-w-[340px] bg-white/40 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] p-12 animate-fade-in flex flex-col items-center border border-white/60 my-auto"
+>
+
+
           <!-- 装饰：顶部极细黑线 -->
           <div class="absolute top-0 left-0 w-full h-[2px] bg-black"></div>
 
@@ -744,18 +1243,70 @@ h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif)
                 class="absolute bottom-0 left-0 w-0 h-[2px] bg-black transition-all duration-500 peer-focus:w-full"
               ></span>
             </div>
-            <!-- === 新增：备用库输入区 === -->
-            <div class="w-full pt-4 border-t border-black/10 mt-2 mb-2">
-              <div class="text-[9px] text-black/40 font-bold mb-2 tracking-widest text-left">BACKUP STORAGE (可选)</div>
-              <div class="relative group mb-2">
-                <input v-model="configB.url" type="text" placeholder="BACKUP URL" style="color: #000000 !important; -webkit-text-fill-color: #000000 !important;" class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.1em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
-              </div>
-              <div class="relative group">
-                <input v-model="configB.key" type="password" placeholder="BACKUP KEY" style="color: #000000 !important; -webkit-text-fill-color: #000000 !important;" class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.1em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
-              </div>
-            </div>
-            <!-- === 新增结束 === -->
+<div class="w-full pt-4 border-t border-black/10 mt-2 mb-2">
+  <button
+    type="button"
+    @click="showBackupConfig = !showBackupConfig"
+    class="w-full flex items-center justify-between text-[9px] text-black/40 font-bold tracking-widest mb-2 hover:text-black/60 transition-colors"
+  >
+    <span>BACKUP STORAGE (可选)</span>
+    <span class="text-[10px]">{{ showBackupConfig ? '▲' : '▼' }}</span>
+  </button>
+  <div v-if="showBackupConfig" class="space-y-2">
+    <div class="relative group">
+      <input v-model="configB.url" type="text" placeholder="BACKUP URL" style="color: #000000 !important; -webkit-text-fill-color: #000000 !important;" class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.1em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
+    </div>
+    <div class="relative group">
+      <input v-model="configB.key" type="password" placeholder="BACKUP KEY" style="color: #000000 !important; -webkit-text-fill-color: #000000 !important;" class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.1em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
+    </div>
+  </div>
+</div>
 
+<div class="w-full pt-4 border-t border-black/10 mt-2 mb-2">
+  <button
+    type="button"
+    @click="showR2Config = !showR2Config"
+    class="w-full flex items-center justify-between text-[9px] text-black/40 font-bold tracking-widest mb-2 hover:text-black/60 transition-colors"
+  >
+    <span>CLOUDFLARE R2 (可选)</span>
+    <span class="text-[10px]">{{ showR2Config ? '▲' : '▼' }}</span>
+  </button>
+  <div v-if="showR2Config" class="space-y-2">
+    <div class="relative group">
+      <input v-model="configR2.endpoint" type="text" placeholder="R2 S3 Endpoint (https://xxx.r2.cloudflarestorage.com)"
+        style="color:#000 !important;-webkit-text-fill-color:#000 !important;"
+        class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.05em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
+    </div>
+    <div class="relative group">
+      <input v-model="configR2.bucket" type="text" placeholder="Bucket 名称 (如 museum)"
+        style="color:#000 !important;-webkit-text-fill-color:#000 !important;"
+        class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.05em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
+    </div>
+    <div class="relative group">
+      <input v-model="configR2.accessKey" type="text" placeholder="Access Key ID"
+        style="color:#000 !important;-webkit-text-fill-color:#000 !important;"
+        class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.05em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
+    </div>
+    <div class="relative group">
+      <input v-model="configR2.secretKey" type="password" placeholder="Secret Access Key"
+        style="color:#000 !important;-webkit-text-fill-color:#000 !important;"
+        class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.05em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
+    </div>
+    <div class="relative group">
+      <input v-model="configR2.publicUrl" type="text" placeholder="公共域名 (https://img.xx.com 或 https://xxx.r2.dev)"
+        style="color:#000 !important;-webkit-text-fill-color:#000 !important;"
+        class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.05em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
+    </div>
+    <div class="relative group">
+      <input v-model="configR2.workerUrl" type="text" placeholder="Worker URL (https://xxx.workers.dev) 用于上传"
+        style="color:#000 !important;-webkit-text-fill-color:#000 !important;"
+        class="peer w-full bg-transparent border-b border-black/30 py-2 text-[10px] font-bold tracking-[0.05em] text-center text-black placeholder-black/30 focus:border-black focus:outline-none transition-all"/>
+    </div>
+    <p class="text-[8px] text-black/30 mt-2 leading-relaxed">
+      Worker URL 用于上传文件（解决 CORS 问题）。公共域名用于生成访问链接，末尾不要带斜杠。
+    </p>
+  </div>
+</div>
             <!-- 邮箱/密码 组合 -->
             <div class="space-y-6 pt-2">
               <div class="relative group">
@@ -810,9 +1361,9 @@ h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif)
         </div>
 
         <!-- 底部版权：增加黑色阴影确保在亮背景上可见 -->
-        <div
-          class="absolute bottom-10 text-[9px] text-black tracking-[0.3em] font-serif opacity-70 mix-blend-multiply"
-        >
+<div
+  class="relative mt-10 shrink-0 text-[9px] text-black tracking-[0.3em] font-serif opacity-70 mix-blend-multiply"
+>
           DESIGNED BY ANTIGRAVITY
         </div>
       </div>
@@ -951,6 +1502,14 @@ h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif)
 >
   数据迁移
 </button>
+<button
+  v-if="session && configR2.endpoint"
+  @click="openR2Migration"
+  class="text-[10px] text-orange-500 hover:text-white ml-4 shrink-0 transition-colors border border-orange-200 px-2 py-1 rounded hover:bg-orange-500 hover:border-orange-500"
+>
+  迁移到 R2
+</button>
+
               <!-- === 修改：变成批量管理入口 === -->
               <button
                 v-if="session"
@@ -2069,17 +2628,21 @@ h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif)
               </button>
             </div>
             <div class="p-8 space-y-6 overflow-y-auto">
-                            <!-- === 新增：存储路线选择开关 (仅在配置了备用库时显示) === -->
-              <div v-if="configB.url" class="flex gap-4 border-b border-gray-100 pb-4">
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" v-model="uploadForm.targetStorage" value="auto" class="accent-black w-3 h-3" />
-                  <span class="text-[10px] tracking-widest text-black font-bold">智能路线 (主库优先)</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" v-model="uploadForm.targetStorage" value="backup" class="accent-green-500 w-3 h-3" />
-                  <span class="text-[10px] tracking-widest text-green-600 font-bold">直达备用库 (Backup)</span>
-                </label>
-              </div>
+<!-- === 存储路线选择 === -->
+<div v-if="configB.url || configR2.endpoint" class="flex flex-wrap gap-3 border-b border-gray-100 pb-4">
+  <label class="flex items-center gap-2 cursor-pointer">
+    <input type="radio" v-model="uploadForm.targetStorage" value="auto" class="accent-black w-3 h-3" />
+    <span class="text-[10px] tracking-widest text-black font-bold">智能（主库优先）</span>
+  </label>
+  <label v-if="configR2.endpoint" class="flex items-center gap-2 cursor-pointer">
+    <input type="radio" v-model="uploadForm.targetStorage" value="r2" class="accent-orange-500 w-3 h-3" />
+    <span class="text-[10px] tracking-widest text-orange-600 font-bold">R2（省带宽）</span>
+  </label>
+  <label v-if="configB.url" class="flex items-center gap-2 cursor-pointer">
+    <input type="radio" v-model="uploadForm.targetStorage" value="backup" class="accent-green-500 w-3 h-3" />
+    <span class="text-[10px] tracking-widest text-green-600 font-bold">Supabase 备用</span>
+  </label>
+</div>
               <div
                 class="flex gap-6 border-b border-gray-100 pb-px overflow-x-auto no-scroll"
               >
@@ -2446,11 +3009,33 @@ h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif)
       <input type="checkbox" v-model="uploadForm.compressEnabled" class="accent-green-500 w-3 h-3" />
       <span class="text-[10px] tracking-widest text-gray-600 font-bold">压缩预览图（节省带宽）</span>
     </label>
-    <p class="text-[9px] text-gray-400 leading-relaxed">
-      实际源文件<span class="text-black font-bold">不会压缩</span>，保证下载质量。<br />
-      预览图优先存入<span class="text-black font-bold">{{ configB.url ? '备用库' : '主库' }}</span>；
-      实际文件始终存主库。
-    </p>
+<p class="text-[9px] text-gray-400 leading-relaxed">
+  实际源文件<span class="text-black font-bold">不会压缩</span>，保证下载质量。<br />
+  预览图优先存入<span class="text-black font-bold">{{ configR2.endpoint ? 'R2' : (configB.url ? '备用库' : '主库') }}</span>；
+  实际文件走当前存储路线选择。
+</p>
+<!-- 预览图存储位置选择 -->
+<div class="mt-2 pt-2 border-t border-gray-100">
+  <p class="text-[9px] text-gray-500 font-bold mb-2 tracking-widest">预览图存储位置</p>
+  <div class="flex flex-wrap gap-2">
+    <label class="flex items-center gap-1.5 cursor-pointer">
+      <input type="radio" v-model="uploadForm.previewStorage" value="auto" class="accent-black w-3 h-3" />
+      <span class="text-[10px] text-gray-600">智能（跟随主文件）</span>
+    </label>
+    <label v-if="configR2.endpoint" class="flex items-center gap-1.5 cursor-pointer">
+      <input type="radio" v-model="uploadForm.previewStorage" value="r2" class="accent-orange-500 w-3 h-3" />
+      <span class="text-[10px] text-orange-600 font-bold">R2</span>
+    </label>
+    <label v-if="configB.url" class="flex items-center gap-1.5 cursor-pointer">
+      <input type="radio" v-model="uploadForm.previewStorage" value="backup" class="accent-green-500 w-3 h-3" />
+      <span class="text-[10px] text-green-600 font-bold">Supabase 备用</span>
+    </label>
+    <label class="flex items-center gap-1.5 cursor-pointer">
+      <input type="radio" v-model="uploadForm.previewStorage" value="main" class="accent-blue-500 w-3 h-3" />
+      <span class="text-[10px] text-blue-600 font-bold">主库</span>
+    </label>
+  </div>
+</div>
     <div v-if="uploadForm.compressEnabled" class="flex items-center gap-3">
       <div class="flex-1">
         <div class="flex justify-between text-[9px] text-gray-400 mb-1">
@@ -2628,7 +3213,7 @@ h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif)
               <span class="text-[11px] tracking-[0.2em] font-bold uppercase text-black">Data Migration (数据迁移)</span>
               <button v-if="!isMigrating" @click="showMigrationModal = false" class="text-xl hover:text-red-500 text-gray-400">&times;</button>
             </div>
-            
+
             <div class="p-6 overflow-y-auto custom-scrollbar space-y-6">
               <!-- 目标账号配置 -->
               <div>
@@ -2676,6 +3261,127 @@ h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif)
           </div>
         </div>
         <!-- === 新增结束 === -->
+         <!-- === 迁移到 R2 模态框 === -->
+<div v-if="showR2Migration" class="fixed inset-0 z-[130] flex items-center justify-center p-4 fullscreen-layer">
+  <div @click="!isR2Migrating && (showR2Migration = false)" class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+  <div class="bg-white w-full max-w-2xl shadow-2xl relative z-10 animate-slide-up flex flex-col max-h-[88vh] rounded-xl overflow-hidden border border-gray-100">
+
+    <!-- 头部 -->
+    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-orange-50/50">
+      <div>
+        <span class="text-[11px] tracking-[0.2em] font-bold uppercase text-orange-600">Migrate to R2</span>
+        <p class="text-[9px] text-gray-500 mt-1">把 Supabase 的图片/文件搬运到 Cloudflare R2，释放 Supabase 带宽</p>
+      </div>
+      <button v-if="!isR2Migrating" @click="showR2Migration = false" class="text-xl hover:text-red-500 text-gray-400">&times;</button>
+    </div>
+
+    <div class="p-6 overflow-y-auto custom-scrollbar space-y-5">
+
+      <!-- 扫描状态 -->
+      <div v-if="!r2ScanDone" class="text-center py-8">
+        <div class="w-6 h-6 border-2 border-orange-200 border-t-orange-500 rounded-full animate-spin mx-auto mb-3"></div>
+        <p class="text-[10px] text-gray-400">正在扫描 Supabase 中的文件...</p>
+      </div>
+
+      <!-- 扫描结果 -->
+      <div v-else class="space-y-4">
+
+        <!-- 汇总 -->
+        <div class="grid grid-cols-3 gap-3">
+          <div class="bg-gray-50 p-3 rounded-lg text-center">
+            <div class="text-xl font-bold text-black">{{ r2Candidates.length }}</div>
+            <div class="text-[9px] text-gray-500 mt-1">可迁移文件</div>
+          </div>
+          <div class="bg-gray-50 p-3 rounded-lg text-center">
+            <div class="text-xl font-bold text-orange-500">{{ r2SelectedIds.length }}</div>
+            <div class="text-[9px] text-gray-500 mt-1">已选择</div>
+          </div>
+          <div class="bg-gray-50 p-3 rounded-lg text-center">
+            <div class="text-xl font-bold text-black">{{ r2Candidates.length - r2SelectedIds.length }}</div>
+            <div class="text-[9px] text-gray-500 mt-1">将保留在 Supabase</div>
+          </div>
+        </div>
+
+        <!-- 过滤 -->
+        <div class="flex gap-2 text-[10px]">
+          <button @click="r2SelectAll" class="px-3 py-1.5 border border-gray-200 rounded hover:bg-black hover:text-white transition">全选</button>
+          <button @click="r2SelectedIds = []" class="px-3 py-1.5 border border-gray-200 rounded hover:bg-black hover:text-white transition">清空</button>
+          <button @click="r2SelectImagesOnly" class="px-3 py-1.5 border border-gray-200 rounded hover:bg-black hover:text-white transition">仅图片类型</button>
+          <button @click="r2SelectByType('role_card')" class="px-3 py-1.5 border border-gray-200 rounded hover:bg-black hover:text-white transition">仅角色卡</button>
+          <button @click="r2SelectByType('beautify')" class="px-3 py-1.5 border border-gray-200 rounded hover:bg-black hover:text-white transition">仅美化</button>
+        </div>
+
+        <!-- 文件列表 -->
+        <div class="border border-gray-100 rounded-lg overflow-hidden max-h-[40vh] overflow-y-auto custom-scrollbar">
+          <div v-if="r2Candidates.length === 0" class="p-8 text-center text-[10px] text-gray-400">
+            没有需要迁移的文件，全部已在 R2 或非 Supabase 链接。
+          </div>
+          <label
+            v-for="c in r2Candidates"
+            :key="c.key"
+            class="flex items-center gap-3 px-3 py-2 border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer text-[10px]"
+          >
+            <input type="checkbox" :value="c.key" v-model="r2SelectedIds" class="accent-orange-500">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase"
+                  :class="{
+                    'bg-blue-100 text-blue-600': c.type === 'image',
+                    'bg-purple-100 text-purple-600': c.type === 'role_card',
+                    'bg-pink-100 text-pink-600': c.type === 'beautify',
+                    'bg-gray-100 text-gray-600': !['image','role_card','beautify'].includes(c.type)
+                  }">
+                  {{ c.type || 'file' }}
+                </span>
+                <span class="text-black font-medium truncate">{{ c.name }}</span>
+              </div>
+              <div class="text-gray-400 truncate mt-0.5">{{ c.url }}</div>
+              <!-- 如果是 item 包含多文件（如角色卡 3 张图），列出子项 -->
+              <div v-if="c.subFiles && c.subFiles.length > 1" class="text-[9px] text-gray-400 mt-1">
+                含 {{ c.subFiles.length }} 个文件
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <!-- 选项 -->
+        <div class="bg-orange-50/50 border border-orange-100 rounded-lg p-3 space-y-2">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" v-model="r2Options.deleteAfter" class="accent-orange-500 w-3 h-3">
+            <span class="text-[10px] text-gray-700">迁移成功后<span class="font-bold text-red-500">删除 Supabase 源文件</span>（释放空间）</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" v-model="r2Options.alsoMigrateEmbedded" class="accent-orange-500 w-3 h-3" checked>
+            <span class="text-[10px] text-gray-700">迁移内容 JSON 中嵌入的链接（角色卡历史、美化变体等）</span>
+          </label>
+        </div>
+
+        <!-- 日志 -->
+        <div v-if="r2Logs.length > 0">
+          <p class="text-[10px] text-gray-400 font-bold mb-2 tracking-widest uppercase">迁移日志</p>
+          <div class="bg-black text-orange-300 p-3 rounded-lg h-40 overflow-y-auto font-mono text-[9px] leading-relaxed custom-scrollbar flex flex-col-reverse">
+            <div v-for="(log, i) in r2Logs" :key="i">{{ log }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部按钮 -->
+    <div class="p-6 border-t border-gray-100 bg-gray-50 flex gap-3">
+      <button @click="showR2Migration = false" :disabled="isR2Migrating"
+        class="flex-1 py-3 border border-gray-200 text-gray-600 text-[10px] font-bold tracking-widest rounded hover:bg-white transition">
+        取消
+      </button>
+      <button @click="startR2Migration"
+        :disabled="isR2Migrating || r2SelectedIds.length === 0"
+        class="flex-[2] py-3 text-white text-[10px] font-bold tracking-[0.2em] uppercase rounded shadow-lg transition-all"
+        :class="isR2Migrating ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'">
+        {{ isR2Migrating ? `迁移中 (${r2Progress}/${r2SelectedIds.length})...` : `开始迁移 ${r2SelectedIds.length} 项到 R2` }}
+      </button>
+    </div>
+  </div>
+</div>
+           
         <!-- iOS 安装引导弹窗 -->
         <div id="ios-install-guide" class="ios-install-guide">
           <div class="flex items-start gap-4">
@@ -2761,40 +3467,197 @@ const compressImage = (file, maxSide = 1600, quality = 0.8, mime = 'image/jpeg')
             key: "",
           });
           const configB = ref({ url: "", key: "" });
+const configR2 = ref({
+  endpoint: "",
+  bucket: "",
+  accessKey: "",
+  secretKey: "",
+  publicUrl: "",
+  workerUrl: "",  // 新增
+});
+
+
+// R2 客户端（用 aws4fetch 包装）
+const r2 = ref(null);
+
+const initR2 = () => {
+  const c = configR2.value;
+  if (!c.endpoint || !c.bucket || !c.accessKey || !c.secretKey || !c.publicUrl) {
+    r2.value = null;
+    return null;
+  }
+  // 去掉末尾斜杠
+  const endpoint = c.endpoint.replace(/\/$/, "");
+  const publicUrl = c.publicUrl.replace(/\/$/, "");
+  const client = new AwsClient({
+    accessKeyId: c.accessKey,
+    secretAccessKey: c.secretKey,
+    service: "s3",
+    region: "auto",
+  });
+  r2.value = { client, endpoint, bucket: c.bucket, publicUrl };
+  console.log("✅ R2 已就绪:", { endpoint, bucket: c.bucket, publicUrl });
+  return r2.value;
+};
+
+// 生成 R2 的公共 URL（用于存库）
+const getR2Url = (key) => {
+  if (!r2.value) throw new Error("R2 未初始化");
+  return `${r2.value.publicUrl}/${encodeURIComponent(key)}`;
+};
+
+const r2Upload = async (file, key, contentType) => {
+  const workerUrl = configR2.value.workerUrl?.trim().replace(/\/$/, "");
+  
+  // 优先走 Worker（解决 CORS）
+  if (workerUrl) {
+    const ct = contentType || file.type || "application/octet-stream";
+    const res = await fetch(`${workerUrl}/${key}`, {
+      method: "PUT",
+      headers: { "Content-Type": ct },
+      body: file,
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Worker 上传失败 (${res.status}): ${text.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    // Worker 返回的 url，或者用 publicUrl 拼接
+    return data.url || getR2Url(key);
+  }
+  
+  // 没有 Worker 则走原来的 aws4fetch 签名直传（仅在同域或 CORS 已配置时有效）
+  if (!r2.value) {
+    if (!initR2()) throw new Error("R2 未初始化，且未配置 Worker URL");
+  }
+  const { client, endpoint, bucket } = r2.value;
+  const url = `${endpoint}/${bucket}/${key}`;
+
+  const signed = await client.sign(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": contentType || file.type || "application/octet-stream",
+      "x-amz-content-sha256": "UNSIGNED-PAYLOAD",
+    },
+  });
+
+  const res = await fetch(signed.url, {
+    method: "PUT",
+    headers: signed.headers,
+    body: file,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`R2 直传失败 (${res.status}): ${text.slice(0, 200)}`);
+  }
+  return getR2Url(key);
+};
+
+
+
+
+const r2Delete = async (keys) => {
+  if (!keys.length) return;
+  const workerUrl = configR2.value.workerUrl?.trim().replace(/\/$/, "");
+  
+  for (const key of keys) {
+    try {
+      if (workerUrl) {
+        // 走 Worker
+        await fetch(`${workerUrl}/${key}`, { method: "DELETE" });
+      } else {
+        // 原来的签名删除
+        if (!r2.value) initR2();
+        if (!r2.value) continue;
+        const { client, endpoint, bucket } = r2.value;
+        const url = `${endpoint}/${bucket}/${encodeURIComponent(key)}`;
+        const signed = await client.sign(url, {
+          method: "DELETE",
+          headers: { "x-amz-content-sha256": "UNSIGNED-PAYLOAD" },
+        });
+        await fetch(signed.url, { method: "DELETE", headers: signed.headers });
+      }
+    } catch (e) {
+      console.warn("R2 删除失败:", key, e);
+    }
+  }
+};
+
+// 从完整 URL 反推 R2 的 key
+const r2KeyFromUrl = (url) => {
+  if (!r2.value || !url) return null;
+  const prefix = r2.value.publicUrl + "/";
+  if (!url.startsWith(prefix)) return null;
+  return decodeURIComponent(url.slice(prefix.length).split("?")[0]);
+};
           const auth = ref({ email: "", password: "" });
           const session = ref(null);
           const items = ref([]);
           const showThemeModal = ref(false);
           const currentTheme = ref("default");
 const themeOptions = [
-  { key: "default", name: "Gallery", desc: "素白 / 基线",
-    previewStyle: "background:#fcfcfc;border:1px solid #f0f0f0" },
-  { key: "album",   name: "Album",   desc: "相册内页 / 横排缩略图 / 分割线",
-    previewStyle: "background:#fff;background-image:radial-gradient(circle at 18% 50%,#e5e5ea 9px,transparent 9px),radial-gradient(circle at 68% 50%,#e5e5ea 9px,transparent 9px);border-bottom:1px solid #e5e5ea;border-radius:0" },
-  { key: "paper",   name: "Paper",   desc: "文件卡 / 图脚注 / 编号式标题",
-    previewStyle: "background:#fff;border:1px solid #e0d8c8;border-radius:0;box-shadow:0 1px 2px rgba(0,0,0,.06)" },
-  { key: "glass",   name: "Glass",   desc: "磨砂玻璃 / 透出渐变 / 内高光",
-    previewStyle: "background:linear-gradient(135deg,#d9e4f5,#f5dfe8);border:1px solid rgba(255,255,255,.85);border-radius:8px;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)" },
-  { key: "sticker", name: "Sticker", desc: "手账贴纸 / 米胶带 / 手绘歪",
-    previewStyle: "background:#fff;border:none;border-radius:8px;box-shadow:0 3px 0 #e8dcc8;transform:rotate(-5deg)" },
-  { key: "cloth",   name: "Cloth",   desc: "毛布 / 顶栏布缝 / 凹陷质感",
-    previewStyle: "background:#f2f5ec;border:none;border-radius:10px;box-shadow:inset 0 2px 4px rgba(122,143,110,.15)" },
-    {
-  key: "polaroid",
-  name: "Polaroid",
-  desc: "拍立得 / 相纸白边 / 微歪",
-  previewStyle: "background:#fff;border:none;border-radius:1px;box-shadow:0 1px 3px rgba(40,60,60,.15);transform:rotate(-4deg);padding:2px",
-},
-{
-  key: "nightfall",
-  name: "Nightfall",
-  desc: "夜间 / 深靛 / 暖灰字",
-  previewStyle: "background:linear-gradient(180deg,#1e2128,#16181d);border:1px solid #2a2e37;border-radius:4px",
-},
-
+  {
+    key: "default",
+    name: "Gallery · 默认原版",
+    desc: "素白 / 100% 原汁原味基线",
+    previewStyle: "background:#fcfcfc;border:1px solid #f0f0f0"
+  },
+  {
+    key: "nightfall",
+    name: "Nightfall · 静谧暗夜",
+    desc: "正常夜间瀑布流 / 深石板护眼 / 全功能无灰边",
+    previewStyle: "background:linear-gradient(145deg,#1a1d24,#111318);border:1.5px solid #3b465e;border-radius:8px;box-shadow:inset 0 0 8px rgba(138,180,248,0.2)"
+  },
+  {
+    key: "wechat",
+    name: "Moments · 朋友圈",
+    desc: "18真头像轮播 / 精致预览图 / 微信双点评论钮",
+    previewStyle: "background:url('https://i.postimg.cc/RJTW8YP4/com-xingin-xhs-20261108013701.png') center/cover;border:2px solid #07c160;border-radius:6px"
+  },
+  {
+    key: "insgram",
+    name: "InsGram · 流光",
+    desc: "彩虹故事圈头像 / 原版SVG矢量三连图标栏",
+    previewStyle: "background:url('https://i.postimg.cc/D82Js2Z0/com-xingin-xhs-20261108013831.png') center/cover padding-box,linear-gradient(45deg,#f09433,#dc2743,#bc1888) border-box;border:2.5px solid transparent;border-radius:50%"
+  },
+  {
+    key: "notion",
+    name: "Notion · 画廊看板",
+    desc: "Database Gallery视图 / 支持美化换色 / 彩色Tag",
+    previewStyle: "background:linear-gradient(180deg,#f7f6f3 50%,#fff 50%);border:1px solid #e9e9e7;border-radius:6px;box-shadow:inset 0 -6px 0 #fdecc8"
+  },
+  {
+    key: "bazaar",
+    name: "Bazaar · 时尚画报",
+    desc: "Vogue双线刊头 / 内嵌画框 / 编号斜体展签",
+    previewStyle: "background:#f4f0ea;border:1.5px solid #161514;border-top:4px double #161514;border-radius:0;box-shadow:3px 3px 0 #d8cfc2"
+  },
+  {
+    key: "kakao",
+    name: "Kakao · 气泡聊",
+    desc: "底部悬浮Dock / 18头像聊天窗 / 奶黄未读气泡",
+    previewStyle: "background:#bacee0;border:2px solid #fee500;border-radius:12px 12px 12px 2px;box-shadow:inset 0 -8px 0 #fee500"
+  },
+  {
+    key: "redbook",
+    name: "RedBook · 小红书",
+    desc: "双列种草卡片 / 左下18真头像 / 矢量小红心",
+    previewStyle: "background:#fff;border:1px solid #eee;border-bottom:8px solid #ff2442;border-radius:8px"
+  },
+  {
+    key: "xstream",
+    name: "X-Stream · 暗黑推文",
+    desc: "纯黑单列流 / 无灰边精致配图 / 矢量转评赞底栏",
+    previewStyle: "background:#000;border:1.5px solid #2f3336;border-left:4px solid #1d9bf0;border-radius:6px"
+  }
 ];
 
+
+
           const filter = ref("all");
+          const showBackupConfig = ref(false);
+const showR2Config = ref(false);
           // --- 新增搜索相关变量 ---
           const searchInput = ref(""); 
           const searchKeyword = ref(""); 
@@ -2958,6 +3821,19 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
 
             if (savedEmail) auth.value.email = savedEmail;
             if (savedPass) auth.value.password = savedPass;
+// 恢复 R2 配置
+const r2e = localStorage.getItem("r2_endpoint");
+const r2b = localStorage.getItem("r2_bucket");
+const r2a = localStorage.getItem("r2_access");
+const r2s = localStorage.getItem("r2_secret");
+const r2p = localStorage.getItem("r2_public");
+if (r2e) configR2.value.endpoint = r2e;
+if (r2b) configR2.value.bucket = r2b;
+if (r2a) configR2.value.accessKey = r2a;
+if (r2s) configR2.value.secretKey = r2s;
+if (r2p) configR2.value.publicUrl = r2p;
+const r2w = localStorage.getItem("r2_worker");
+if (r2w) configR2.value.workerUrl = r2w;
 
             // 2. 恢复主题读取
             const savedTheme = localStorage.getItem("museum_theme");
@@ -3713,6 +4589,21 @@ const compressImage = (file, opts = {}) => {
                    window.supabaseB = null;
                 }
               }
+// === 初始化 R2 ===
+const r2Ready = initR2();
+if (r2Ready) {
+  console.log("✅ R2 已连接:", r2Ready.publicUrl);
+} else if (configR2.value.endpoint) {
+  console.warn("⚠️ R2 配置不完整，已禁用 R2");
+}
+
+// === 保存 R2 配置到 localStorage ===
+localStorage.setItem("r2_endpoint", configR2.value.endpoint.trim());
+localStorage.setItem("r2_bucket", configR2.value.bucket.trim());
+localStorage.setItem("r2_access", configR2.value.accessKey.trim());
+localStorage.setItem("r2_secret", configR2.value.secretKey.trim());
+localStorage.setItem("r2_public", configR2.value.publicUrl.trim());
+localStorage.setItem("r2_worker", configR2.value.workerUrl.trim());
 
               // 登录成功，开始加载数据
               session.value = data.session;
@@ -3844,6 +4735,220 @@ const compressImage = (file, opts = {}) => {
             isBatchMode.value = false;
             await fetchData();
           };
+// ============ R2 迁移功能 ============
+const showR2Migration = ref(false);
+const isR2Migrating = ref(false);
+const r2ScanDone = ref(false);
+const r2Candidates = ref([]);     // 待迁移项目
+const r2SelectedIds = ref([]);    // 已选中的 key
+const r2Logs = ref([]);
+const r2Progress = ref(0);
+const r2Options = ref({
+  deleteAfter: false,
+  alsoMigrateEmbedded: true,
+});
+
+// 从 item 中提取所有 Supabase 文件 URL
+const extractSupabaseUrls = (item) => {
+  const urls = new Set();
+  const supabasePrefix = config.value.url.trim() + "/storage/v1/object/public/uploads/";
+
+  // 1. 主 file_url
+  if (item.file_url && item.file_url.includes(supabasePrefix)) {
+    urls.add(item.file_url);
+  }
+
+  // 2. content 里嵌入的 URL（角色卡 history 的 png/json/qr，美化 variations 的 preview/file 等）
+  if (item.content && typeof item.content === "string") {
+    // 简单粗暴：正则找所有 Supabase 链接
+    const regex = /https?:\/\/[^\s"'\\<>)]+\/storage\/v1\/object\/public\/uploads\/[^\s"'\\<>)]+/g;
+    const matches = item.content.match(regex) || [];
+    matches.forEach((u) => {
+      if (u.includes(supabasePrefix)) urls.add(u);
+    });
+  }
+  return Array.from(urls);
+};
+
+// 打开模态框并扫描
+const openR2Migration = async () => {
+  showR2Migration.value = true;
+  r2ScanDone.value = false;
+  r2Candidates.value = [];
+  r2SelectedIds.value = [];
+  r2Logs.value = [];
+
+  if (!r2.value && !initR2()) {
+    alert("R2 未配置，请先在登录页填入 R2 信息后重新登录");
+    showR2Migration.value = false;
+    return;
+  }
+
+  // 扫描 items 里所有引用 Supabase 的项
+  const supabaseUrl = config.value.url.trim();
+  const candidates = [];
+  for (const item of items.value) {
+    const urls = extractSupabaseUrls(item);
+    if (urls.length === 0) continue;
+
+    // 用 item.id 作为候选 key（一个 item 可能含多个文件）
+    candidates.push({
+      key: `item_${item.id}`,
+      itemId: item.id,
+      type: item.type,
+      name: item.content
+        ? (item.type === "role_card"
+            ? getRoleCardData(item).name
+            : item.type === "beautify"
+              ? getBeautifyData(item).title
+              : (item.content.length > 40 ? item.content.slice(0, 40) + "..." : item.content))
+        : (item.file_url ? item.file_url.split("/").pop() : "无标题"),
+      url: item.file_url || urls[0],
+      files: urls,
+      subFiles: urls,
+    });
+  }
+
+  r2Candidates.value = candidates;
+  r2SelectedIds.value = candidates.map((c) => c.key); // 默认全选
+  r2ScanDone.value = true;
+};
+
+// 选择辅助
+const r2SelectAll = () => { r2SelectedIds.value = r2Candidates.value.map(c => c.key); };
+const r2SelectByType = (t) => {
+  r2SelectedIds.value = r2Candidates.value.filter(c => c.type === t).map(c => c.key);
+};
+const r2SelectImagesOnly = () => {
+  r2SelectedIds.value = r2Candidates.value.filter(c => c.type === "image").map(c => c.key);
+};
+
+// 从 URL 下载并上传到 R2，返回 R2 新 URL
+const migrateUrlToR2 = async (oldUrl) => {
+  // 提取文件名（保持原路径结构，但放到 r2 桶根目录下）
+  const urlObj = new URL(oldUrl);
+  const pathParts = urlObj.pathname.split("/");
+  const fileName = pathParts[pathParts.length - 1];
+  // 加上时间戳前缀防止冲突（如果同名文件覆盖也 OJBK，但我们保守起见）
+  // 更好做法：保留原文件名，去掉目录（因为我们不知道原目录结构）
+  const key = fileName;
+
+  // 下载
+  r2Logs.value.unshift(`  ↓ 下载: ${fileName}`);
+  const res = await fetch(oldUrl);
+  if (!res.ok) throw new Error(`下载失败 ${res.status}`);
+  const blob = await res.blob();
+
+  // 上传
+  r2Logs.value.unshift(`  ↑ 上传到 R2: ${key} (${(blob.size / 1024).toFixed(0)}KB)`);
+  const newUrl = await r2Upload(
+    new File([blob], fileName, { type: blob.type }),
+    key,
+    blob.type
+  );
+  return newUrl;
+};
+
+// 执行迁移
+const startR2Migration = async () => {
+  if (r2SelectedIds.value.length === 0) return;
+
+  isR2Migrating.value = true;
+  r2Progress.value = 0;
+  r2Logs.value = [];
+
+  const selected = r2Candidates.value.filter(c => r2SelectedIds.value.includes(c.key));
+  const supabasePrefix = config.value.url.trim() + "/storage/v1/object/public/uploads/";
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (let i = 0; i < selected.length; i++) {
+    const cand = selected[i];
+    r2Progress.value = i + 1;
+    r2Logs.value.unshift(`[${new Date().toLocaleTimeString()}] 处理 (${i+1}/${selected.length}): ${cand.name}`);
+
+    try {
+      const item = items.value.find(it => it.id === cand.itemId);
+      if (!item) {
+        r2Logs.value.unshift(`  ! 找不到 item，跳过`);
+        failCount++;
+        continue;
+      }
+
+      // 存储 URL 映射表：旧 URL → 新 URL
+      const urlMap = {};
+
+      // 1. 主 file_url（若是 Supabase 的）
+      if (item.file_url && item.file_url.includes(supabasePrefix)) {
+        const newUrl = await migrateUrlToR2(item.file_url);
+        urlMap[item.file_url] = newUrl;
+      }
+
+      // 2. content 里的所有嵌入 URL
+      if (r2Options.value.alsoMigrateEmbedded && item.content) {
+        for (const u of cand.files) {
+          if (urlMap[u]) continue;
+          try {
+            const newUrl = await migrateUrlToR2(u);
+            urlMap[u] = newUrl;
+          } catch (e) {
+            r2Logs.value.unshift(`  ! 子文件失败: ${u} - ${e.message}`);
+          }
+        }
+      }
+
+      // 3. 替换 URL 并更新数据库
+      let newFileUrl = item.file_url;
+      let newContent = item.content;
+
+      // 使用最长匹配优先，避免部分替换
+      const sortedOldUrls = Object.keys(urlMap).sort((a, b) => b.length - a.length);
+      for (const oldU of sortedOldUrls) {
+        if (newFileUrl) newFileUrl = newFileUrl.split(oldU).join(urlMap[oldU]);
+        if (newContent && typeof newContent === "string") {
+          newContent = newContent.split(oldU).join(urlMap[oldU]);
+        }
+      }
+
+      const payload = { file_url: newFileUrl, content: newContent };
+      const { error: dbErr } = await supabase
+        .from("fragments")
+        .update(payload)
+        .eq("id", item.id);
+
+      if (dbErr) throw new Error("更新数据库失败: " + dbErr.message);
+
+      // 4. 删除 Supabase 源文件（如果勾选）
+      if (r2Options.value.deleteAfter) {
+        const keysToDelete = cand.files.map(u => {
+          const parts = u.split("/uploads/");
+          return parts.length > 1 ? parts[1].split("?")[0] : null;
+        }).filter(Boolean);
+        if (keysToDelete.length) {
+          r2Logs.value.unshift(`  × 删除 Supabase 源文件 (${keysToDelete.length} 个)`);
+          await supabase.storage.from("uploads").remove(keysToDelete);
+        }
+      }
+
+      successCount++;
+      r2Logs.value.unshift(`  ✓ 完成`);
+    } catch (e) {
+      failCount++;
+      r2Logs.value.unshift(`  ✗ 失败: ${e.message}`);
+    }
+  }
+
+  r2Logs.value.unshift(`🎉 迁移结束！成功 ${successCount}，失败 ${failCount}`);
+
+  await fetchData(); // 刷新列表
+
+  // 3 秒后关闭
+  setTimeout(() => {
+    isR2Migrating.value = false;
+    showR2Migration.value = false;
+  }, 3000);
+};
 
 
           // ... 修改 fetchData 函数，在获取数据后调用上面这个函数 ...
@@ -4792,65 +5897,123 @@ const compressImage = (file, opts = {}) => {
               .then(() => alert("已复制到剪贴板"));
           };
 
-          const deleteItem = async (item) => {
-            if (!confirm("确认删除?")) return;
-            try {
-              if (
-                item.file_url &&
-                item.type !== "link" &&
-                item.type !== "beautify"
-              ) {
-                const p = item.file_url.split("/uploads/").pop();
-                if (p) await supabase.storage.from("uploads").remove([p]);
-              }
-              // 如果是美化，可能需要清理多个文件，这里暂不处理深度清理，仅删除记录
-              await supabase.from("fragments").delete().eq("id", item.id);
-              items.value = items.value.filter((i) => i.id !== item.id);
-            } catch (e) {
-              alert(e.message);
-            }
-          };
-          // === 新增：批量删除整个相册功能 ===
-          const deleteCurrentAlbum = async () => {
-            if (!currentAlbum.value || !supabase) return;
-            const albumName = currentAlbum.value;
-            const itemsToDelete = items.value.filter(i => i.album_name === albumName);
-            
-            const displayAlbumName = albumName.startsWith('.') ? albumName.substring(1) : albumName;
-            
-            if (!confirm(`⚠️ 危险操作：\n确定要永久删除相册 "${displayAlbumName}" 及其包含的 ${itemsToDelete.length} 张图片吗？此操作无法恢复！`)) {
-              return;
-            }
+const deleteItem = async (item) => {
+  if (!confirm("确认删除?")) return;
+  try {
+    // 收集所有需要清理的 URL（主文件 + content 里嵌入的）
+    const allUrls = [];
+    if (item.file_url) allUrls.push(item.file_url);
+    if (item.content && typeof item.content === "string") {
+      const regex = /https?:\/\/[^\s"'\\<>)]+/g;
+      const matches = item.content.match(regex) || [];
+      matches.forEach(u => {
+        if (!allUrls.includes(u)) allUrls.push(u);
+      });
+    }
 
-            loading.value = true;
-            try {
-              // 1. 批量收集需要从存储桶(Storage)删除的文件路径
-              const filePaths = itemsToDelete
-                .map(item => item.file_url ? item.file_url.split("/uploads/").pop() : null)
-                .filter(path => path);
+    // 分类：Supabase 的 vs R2 的
+    const supabasePrefix = config.value.url.trim() + "/storage/v1/object/public/uploads/";
+    const r2PublicUrl = configR2.value.publicUrl?.trim().replace(/\/$/, "");
 
-              if (filePaths.length > 0) {
-                const { error: storageError } = await supabase.storage.from("uploads").remove(filePaths);
-                if (storageError) console.error("批量删除文件失败:", storageError);
-              }
+    const supabaseKeys = [];
+    const r2Keys = [];
 
-              // 2. 批量从数据库删除记录
-              const { error: dbError } = await supabase.from("fragments").delete().eq("album_name", albumName);
-              if (dbError) throw dbError;
+    for (const u of allUrls) {
+      if (u.includes("/storage/v1/object/public/uploads/")) {
+        const p = u.split("/uploads/").pop()?.split("?")[0];
+        if (p && !supabaseKeys.includes(p)) supabaseKeys.push(p);
+      } else if (r2PublicUrl && u.startsWith(r2PublicUrl + "/")) {
+        const k = decodeURIComponent(u.slice(r2PublicUrl.length + 1).split("?")[0]);
+        if (k && !r2Keys.includes(k)) r2Keys.push(k);
+      }
+    }
 
-              // 3. 更新本地数据状态
-              items.value = items.value.filter(i => i.album_name !== albumName);
-              
-              // 4. 重置视图，退回到相册列表页面
-              currentAlbum.value = null;
-              filter.value = "albums";
-              
-            } catch (e) {
-              alert("删除相册失败: " + e.message);
-            } finally {
-              loading.value = false;
-            }
-          };
+    // 删 Supabase 文件
+    if (supabaseKeys.length) {
+      await supabase.storage.from("uploads").remove(supabaseKeys);
+    }
+
+    // 删 R2 文件
+    if (r2Keys.length && r2.value) {
+      await r2Delete(r2Keys);
+    }
+
+    // 删数据库记录
+    await supabase.from("fragments").delete().eq("id", item.id);
+    items.value = items.value.filter((i) => i.id !== item.id);
+  } catch (e) {
+    alert(e.message);
+  }
+};
+
+ const deleteCurrentAlbum = async () => {
+  if (!currentAlbum.value || !supabase) return;
+  const albumName = currentAlbum.value;
+  const itemsToDelete = items.value.filter(i => i.album_name === albumName);
+  
+  const displayAlbumName = albumName.startsWith('.') ? albumName.substring(1) : albumName;
+  
+  if (!confirm(`⚠️ 危险操作：\n确定要永久删除相册 "${displayAlbumName}" 及其包含的 ${itemsToDelete.length} 张图片吗？此操作无法恢复！`)) {
+    return;
+  }
+
+  loading.value = true;
+  try {
+    const supabasePrefix = config.value.url.trim() + "/storage/v1/object/public/uploads/";
+    const r2PublicUrl = configR2.value.publicUrl?.trim().replace(/\/$/, "");
+
+    const supabaseKeys = [];
+    const r2Keys = [];
+
+    for (const item of itemsToDelete) {
+      // 收集该 item 的所有 URL
+      const allUrls = [];
+      if (item.file_url) allUrls.push(item.file_url);
+      if (item.content && typeof item.content === "string") {
+        const regex = /https?:\/\/[^\s"'\\<>)]+/g;
+        const matches = item.content.match(regex) || [];
+        matches.forEach(u => {
+          if (!allUrls.includes(u)) allUrls.push(u);
+        });
+      }
+
+      // 分类
+      for (const u of allUrls) {
+        if (u.includes("/storage/v1/object/public/uploads/")) {
+          const p = u.split("/uploads/").pop()?.split("?")[0];
+          if (p && !supabaseKeys.includes(p)) supabaseKeys.push(p);
+        } else if (r2PublicUrl && u.startsWith(r2PublicUrl + "/")) {
+          const k = decodeURIComponent(u.slice(r2PublicUrl.length + 1).split("?")[0]);
+          if (k && !r2Keys.includes(k)) r2Keys.push(k);
+        }
+      }
+    }
+
+    // 删 Supabase 文件
+    if (supabaseKeys.length) {
+      const { error: storageError } = await supabase.storage.from("uploads").remove(supabaseKeys);
+      if (storageError) console.error("批量删除 Supabase 文件失败:", storageError);
+    }
+
+    // 删 R2 文件
+    if (r2Keys.length && r2.value) {
+      await r2Delete(r2Keys);
+    }
+
+    // 删数据库记录
+    const { error: dbError } = await supabase.from("fragments").delete().eq("album_name", albumName);
+    if (dbError) throw dbError;
+
+    items.value = items.value.filter(i => i.album_name !== albumName);
+    currentAlbum.value = null;
+    filter.value = "albums";
+    
+  } catch (e) {
+    alert("删除相册失败: " + e.message);
+  } finally {
+    loading.value = false;
+  }
+};
 
           const handleOpenHtml = async (item) => {
             try {
@@ -4991,6 +6154,7 @@ const compressImage = (file, opts = {}) => {
   compressEnabled: true,      // <--- 新增
   compressMaxSide: 1920,      // <--- 新增
   compressQuality: 0.8,       // <--- 新增
+  previewStorage: "auto",  // 预览图存储：auto | r2 | backup | main
               category: item.category || "", // 把旧标签填回去！
               // 下面是修改后的逻辑：美化类型要读取解析后的 title
               title: isBeautify
@@ -5072,97 +6236,154 @@ const compressImage = (file, opts = {}) => {
               loading.value = false;
             }
           };
-          // === 【加强版】智能降级标准上传 (支持强制走备用库) ===
-          const uploadToStorage = async (file, fileName, options = {}) => {
-            // 检查用户是否在面板上选择了“直达备用库”
-            const forceBackup = uploadForm.value.targetStorage === 'backup';
+// === 【三路路由】上传统一入口 ===
+// targetStorage: 'auto' | 'backup' | 'r2' | 'main'
+const uploadToStorage = async (file, fileName, options = {}) => {
+  const target = uploadForm.value.targetStorage || "auto";
 
-            if (forceBackup && window.supabaseB) {
-              console.log("👉 用户指定直达备用库...");
-              const { data, error } = await window.supabaseB.storage.from("uploads").upload(fileName, file, options);
-              if (error) throw new Error("备用存储上传失败: " + error.message);
-              return window.supabaseB.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
-            }
-
-            try {
-              // 否则走默认的“智能路线”：优先尝试主库 A
-              const { data, error } = await supabase.storage.from("uploads").upload(fileName, file, options);
-              if (error) throw error;
-              return supabase.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
-            } catch (err) {
-              console.warn("主存储上传失败，原因:", err.message);
-              if (!window.supabaseB) throw new Error("主存储失败，且未配置备用存储！原错误: " + err.message);
-              
-              console.log("🔄 正在自动切换至备用存储 (Supabase B)...");
-              const { data, error } = await window.supabaseB.storage.from("uploads").upload(fileName, file, options);
-              if (error) throw new Error("备用存储也满或失败了: " + error.message);
-              return window.supabaseB.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
-            }
-          };
-// === 【新增】美化预览图专用上传：有备用库就走备用，没有就主库 ===
-const uploadPreviewImage = async (file, fileName, options = {}) => {
-  // 有备用库 → 优先备用
-  if (window.supabaseB) {
-    try {
-      const { error } = await window.supabaseB.storage
-        .from("uploads")
-        .upload(fileName, file, options);
-      if (!error) {
-        return window.supabaseB.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
-      }
-      console.warn("预览图备用库上传失败，回退主库:", error.message);
-    } catch (e) {
-      console.warn("预览图备用库异常，回退主库:", e.message);
-    }
+  // 1. 直达 R2
+  if (target === "r2") {
+    if (!r2.value && !initR2()) throw new Error("R2 未配置，无法使用直达 R2");
+    const contentType = options.contentType || file.type || "application/octet-stream";
+    return await r2Upload(file, fileName, contentType);
   }
-  // 无备用库或备用失败 → 主库
-  return await uploadToStorage(file, fileName, options);
+
+  // 2. 直达备用 Supabase B
+  if (target === "backup" && window.supabaseB) {
+    const { error } = await window.supabaseB.storage.from("uploads").upload(fileName, file, options);
+    if (error) throw new Error("备用存储上传失败: " + error.message);
+    return window.supabaseB.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+  }
+
+  // 3. 主库 Supabase A
+  try {
+    const { error } = await supabase.storage.from("uploads").upload(fileName, file, options);
+    if (error) throw error;
+    return supabase.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+  } catch (err) {
+    console.warn("主存储失败:", err.message);
+
+    // 3.1 有 R2 → 自动降级到 R2
+    if (initR2()) {
+      console.log("🔄 自动降级到 R2...");
+      const contentType = options.contentType || file.type || "application/octet-stream";
+      return await r2Upload(file, fileName, contentType);
+    }
+    // 3.2 有备用 Supabase B → 降级到 B
+    if (window.supabaseB) {
+      console.log("🔄 降级到 Supabase B...");
+      const { error } = await window.supabaseB.storage.from("uploads").upload(fileName, file, options);
+      if (error) throw new Error("备用存储也失败: " + error.message);
+      return window.supabaseB.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+    }
+    throw new Error("主存储失败，且无 R2/备用库可降级。原错误: " + err.message);
+  }
 };
 
-          // === 【加强版】智能降级 TUS 断点续传 (支持强制走备用库) ===
-          const uploadWithTus = (file, fileName) => {
-            return new Promise(async (resolve, reject) => { // 注意这里加了 async
-              const forceBackup = uploadForm.value.targetStorage === 'backup';
 
-              const startTus = (client, endpointUrl, token, isFallback = false) => {
-                const endpoint = `${endpointUrl.replace(/\/$/, "")}/storage/v1/upload/resumable`;
-                const upload = new tus.Upload(file, {
-                  endpoint: endpoint,
-                  retryDelays: [0, 3000, 5000],
-                  headers: {
-                    authorization: `Bearer ${token}`,
-                    "x-client-info": "supabase-js-web",
-                  },
-                  metadata: { bucketName: "uploads", objectName: fileName, contentType: file.type, cacheControl: "3600" },
-                  chunkSize: 6 * 1024 * 1024,
-                  onError: async (error) => {
-                    console.error("TUS 上传失败:", error);
-                    // 只有在【智能模式】且当前是【主库】报错时，才自动切换备用库
-                    if (!forceBackup && !isFallback && client === supabase && window.supabaseB) {
-                        console.log("🔄 自动切换备用存储进行 TUS 断点续传...");
-                        const { data } = await window.supabaseB.auth.getSession();
-                        startTus(window.supabaseB, configB.value.url, data.session.access_token, true);
-                    } else {
-                        reject(error);
-                    }
-                  },
-                  onSuccess: () => {
-                    const url = client.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
-                    resolve(url); 
-                  },
-                });
-                upload.start();
-              };
+const uploadPreviewImage = async (file, fileName, options = {}) => {
+  const target = uploadForm.value.previewStorage || "auto";
 
-              // 根据用户的选择，决定从哪个库发车
-              if (forceBackup && window.supabaseB) {
-                const { data } = await window.supabaseB.auth.getSession();
-                startTus(window.supabaseB, configB.value.url, data.session.access_token, true);
-              } else {
-                startTus(supabase, config.value.url, session.value.access_token, false);
-              }
-            });
-          };
+  // 明确指定 R2
+  if (target === "r2") {
+    if (!r2.value && !initR2()) throw new Error("R2 未配置");
+    const contentType = options.contentType || file.type || "image/jpeg";
+    return await r2Upload(file, fileName, contentType);
+  }
+
+  // 明确指定备用库
+  if (target === "backup" && window.supabaseB) {
+    const { error } = await window.supabaseB.storage.from("uploads").upload(fileName, file, options);
+    if (error) throw new Error("备用库上传失败: " + error.message);
+    return window.supabaseB.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+  }
+
+  // 明确指定主库
+  if (target === "main") {
+    const { error } = await supabase.storage.from("uploads").upload(fileName, file, options);
+    if (error) throw new Error("主库上传失败: " + error.message);
+    return supabase.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+  }
+
+  // auto：R2 > 备用库 > 主库
+  if (initR2()) {
+    try {
+      const contentType = options.contentType || file.type || "image/jpeg";
+      return await r2Upload(file, fileName, contentType);
+    } catch (e) {
+      console.warn("预览图 R2 失败，回退:", e.message);
+    }
+  }
+  if (window.supabaseB) {
+    try {
+      const { error } = await window.supabaseB.storage.from("uploads").upload(fileName, file, options);
+      if (!error) return window.supabaseB.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+    } catch (e) {
+      console.warn("预览图备用库异常:", e.message);
+    }
+  }
+  const { error } = await supabase.storage.from("uploads").upload(fileName, file, options);
+  if (error) throw new Error("主库上传失败: " + error.message);
+  return supabase.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+};
+
+
+const uploadWithTus = (file, fileName) => {
+  return new Promise(async (resolve, reject) => {
+    const target = uploadForm.value.targetStorage;
+
+    // R2 目标：直接走普通 PUT，不用 TUS
+    if (target === "r2") {
+      uploadToStorage(file, fileName)
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
+    const forceBackup = target === "backup";
+
+    const startTus = (client, endpointUrl, token, isFallback = false) => {
+      const endpoint = `${endpointUrl.replace(/\/$/, "")}/storage/v1/upload/resumable`;
+      const upload = new tus.Upload(file, {
+        endpoint: endpoint,
+        retryDelays: [0, 3000, 5000],
+        headers: {
+          authorization: `Bearer ${token}`,
+          "x-client-info": "supabase-js-web",
+        },
+        metadata: { bucketName: "uploads", objectName: fileName, contentType: file.type, cacheControl: "3600" },
+        chunkSize: 6 * 1024 * 1024,
+        onError: async (error) => {
+          console.error("TUS 上传失败:", error);
+          if (!forceBackup && !isFallback && client === supabase && window.supabaseB) {
+            console.log("🔄 自动切换备用存储进行 TUS 断点续传...");
+            const { data } = await window.supabaseB.auth.getSession();
+            startTus(window.supabaseB, configB.value.url, data.session.access_token, true);
+          } else if (!isFallback && initR2()) {
+            // TUS 失败且有 R2，降级到 R2 普通上传
+            console.log("🔄 TUS 失败，降级到 R2...");
+            uploadToStorage(file, fileName).then(resolve).catch(reject);
+          } else {
+            reject(error);
+          }
+        },
+        onSuccess: () => {
+          const url = client.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+          resolve(url);
+        },
+      });
+      upload.start();
+    };
+
+    if (forceBackup && window.supabaseB) {
+      const { data } = await window.supabaseB.auth.getSession();
+      startTus(window.supabaseB, configB.value.url, data.session.access_token, true);
+    } else {
+      startTus(supabase, config.value.url, session.value.access_token, false);
+    }
+  });
+};
+
 
 
           const submitUpload = async () => {
@@ -5885,6 +7106,23 @@ hideAlbumList,
             albumSuggestions,
             applyAlbumSuggestion,
             // === 新增结束 ===
+            // R2 相关
+configR2,
+showR2Migration,
+isR2Migrating,
+r2ScanDone,
+r2Candidates,
+r2SelectedIds,
+r2Logs,
+r2Progress,
+r2Options,
+openR2Migration,
+startR2Migration,
+r2SelectAll,
+r2SelectByType,
+r2SelectImagesOnly,
+showBackupConfig,
+showR2Config,
           };
         },
       }).mount("#app");
