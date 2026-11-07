@@ -95,217 +95,449 @@
       };
     </script>
     <style>
-      /* === 主题定义 === */
-      :root {
-        /* 默认: 素白 (Original) */
-        --bg-main: #fcfcfc;
-        --bg-panel: #ffffff;
-        --text-main: #0f0f0f;
-        --text-sub: #888888;
-        --border-color: #f1f1f1;
-        --accent-color: #000000;
-      }
+/* ═════════════════════════════════════════════════════════
+   主题 v7 — 6 套，每套改的"维度"不同，而不是换漆
+   改的地方：排版 / 文字 / 透明 / 手账 / 整页装饰
+   ═════════════════════════════════════════════════════════ */
 
-      /* Lavender (淡紫 - 修改版) */
-      [data-theme="lavender"] {
-        /* 背景：极淡的紫白，不再是深紫 */
-        --bg-main: #fdfbfd;
+/* ── 0. Gallery ── */
+:root {
+  --bg-main: #fcfcfc; --bg-panel: #ffffff;
+  --text-main: #0f0f0f; --text-sub: #888;
+  --border-color: #f0f0f0; --accent-color: #000;
+}
 
-        /* 面板：增加白色透明度，让它看起来像磨砂玻璃 */
-        --bg-panel: rgba(255, 255, 255, 0.75);
+/* ═══════ 1. ALBUM —— 改"排版方向" ═══════
+   卡片不再是纵向图+文，变成横向的"缩略图 | 信息"
+   ═══════════════════════════════════════════ */
+[data-theme="album"] {
+  --bg-main: #ffffff; --bg-panel: #ffffff;
+  --text-main: #1a1a1a; --text-sub: #8e8e93;
+  --border-color: transparent; --accent-color: #007aff;
+}
+[data-theme="album"] body { background:#fff; }
+[data-theme="album"] main .columns-2,
+[data-theme="album"] main [class^="columns-"] {
+  columns: 1 !important;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+/* 卡片横排 */
+[data-theme="album"] main .break-inside-avoid {
+  display: flex !important;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 8px;
+  margin: 0 !important;
+  border: none !important;
+  border-bottom: 0.5px solid #e5e5ea !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+[data-theme="album"] main .break-inside-avoid:hover {
+  background: #f7f7f8 !important;
+}
+/* 图片容器变 72 圆缩略图 */
+[data-theme="album"] main .break-inside-avoid > .aspect-square,
+[data-theme="album"] main .break-inside-avoid > div[class*="aspect-"],
+[data-theme="album"] main .break-inside-avoid .perspective-1000 {
+  flex: 0 0 72px;
+  width: 72px !important;
+  height: 72px !important;
+  aspect-ratio: 1/1 !important;
+  border-radius: 12px;
+  overflow: hidden;
+}
+[data-theme="album"] main img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  border-radius: 12px !important;
+}
+[data-theme="album"] main .break-inside-avoid > div[class*="p-4"] {
+  flex: 1;
+  padding: 0 !important;
+  background: transparent !important;
+}
+[data-theme="album"] button[class*="fixed right-10"] {
+  background: #007aff !important;
+  box-shadow: 0 4px 16px rgba(0,122,255,0.35) !important;
+}
 
-        /* 文字：使用柔和的灰紫色，而不是刺眼的深蓝 */
-        --text-main: #5e548e;
+/* ═══════ 2. PAPER —— 改"文字整合" ═══════
+   不是卡片换肤，是把"图 + 字"整合成文件卡的样式：
+   图贴满、无圆角、文字像文件号、有横线可分
+   ═══════════════════════════════════════════ */
+[data-theme="paper"] {
+  --bg-main: #f4f1ea; --bg-panel: #ffffff;
+  --text-main: #2b2b2b; --text-sub: #8a8278;
+  --border-color: #e0d8c8; --accent-color: #8a7a5c;
+}
+[data-theme="paper"] body {
+  background-color: #f4f1ea;
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0px, transparent 27px, rgba(0,0,0,0.03) 27px, rgba(0,0,0,0.03) 28px);
+}
+[data-theme="paper"] main .break-inside-avoid {
+  background: #fff;
+  border: 1px solid #e0d8c8 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+  padding: 0;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+[data-theme="paper"] main .break-inside-avoid:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important;
+}
+/* 图贴满无圆角 */
+[data-theme="paper"] main .break-inside-avoid > div[class*="aspect-"],
+[data-theme="paper"] main .break-inside-avoid > .aspect-square,
+[data-theme="paper"] main img {
+  border-radius: 0 !important;
+}
+/* 文字区变"文件号"——加一条横线、缩进、字号变小 */
+[data-theme="paper"] main .break-inside-avoid > div[class*="p-4"] {
+  padding: 12px 16px 14px !important;
+  border-top: 1px solid #e0d8c8;
+  background: #fff !important;
+}
+[data-theme="paper"] main .break-inside-avoid > div[class*="p-4"] h3 {
+  font-family: "Noto Serif SC", Georgia, serif !important;
+  font-size: 13px !important;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+[data-theme="paper"] main .break-inside-avoid > div[class*="p-4"] > div:last-child {
+  border-top: 1px dashed #e0d8c8 !important;
+  padding-top: 8px;
+  margin-top: 8px;
+  font-size: 9px !important;
+  color: #8a8278 !important;
+}
+[data-theme="paper"] button[class*="fixed right-10"] {
+  background: #8a7a5c !important;
+  border-radius: 0 !important;
+  box-shadow: 2px 2px 0 rgba(138,122,92,0.35) !important;
+}
 
-        /* 辅助字：浅灰紫 */
-        --text-sub: #9f9aa4;
+/* ═══════ 3. GLASS —— 改"透明层" ═══════
+   磨砂玻璃，能看见后面渐变
+   ═══════════════════════════════════════════ */
+[data-theme="glass"] {
+  --bg-main: #edf0f5; --bg-panel: rgba(255,255,255,0.55);
+  --text-main: #2b3340; --text-sub: #7a8494;
+  --border-color: rgba(255,255,255,0.8); --accent-color: #5b8def;
+}
+[data-theme="glass"] body {
+  background: linear-gradient(135deg, #d9e4f5 0%, #e8ddf5 50%, #f5dfe8 100%);
+  background-attachment: fixed;
+}
+[data-theme="glass"] main .break-inside-avoid {
+  background: rgba(255,255,255,0.45) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.8) !important;
+  border-radius: 16px !important;
+  box-shadow:
+    0 4px 20px rgba(90,120,180,0.1),
+    inset 0 1px 0 rgba(255,255,255,0.9) !important;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+[data-theme="glass"] main .break-inside-avoid:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 12px 32px rgba(90,120,180,0.18),
+    inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+[data-theme="glass"] main img {
+  border-radius: 16px 16px 0 0 !important;
+}
+[data-theme="glass"] main .break-inside-avoid > div[class*="p-4"] {
+  background: rgba(255,255,255,0.5) !important;
+  backdrop-filter: blur(12px);
+}
+[data-theme="glass"] button[class*="fixed right-10"] {
+  background: rgba(91,141,239,0.9) !important;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(91,141,239,0.4) !important;
+}
 
-        /* 边框：几乎透明的白紫色 */
-        --border-color: rgba(255, 255, 255, 0.6);
+/* ═══════ 4. STICKER —— 改"手账装饰"（去粉，变米） ═══════
+   不粉了：米色胶带、暖灰投影、手绘歪
+   ═══════════════════════════════════════════ */
+[data-theme="sticker"] {
+  --bg-main: #fbf7f0; --bg-panel: #ffffff;
+  --text-main: #38312a; --text-sub: #9e9184;
+  --border-color: transparent; --accent-color: #b89b7a;
+}
+[data-theme="sticker"] body {
+  background-color: #fbf7f0;
+  background-image:
+    radial-gradient(circle at 15% 20%, rgba(184,155,122,0.06) 0%, transparent 35%),
+    radial-gradient(circle at 85% 80%, rgba(184,155,122,0.06) 0%, transparent 35%);
+  background-attachment: fixed;
+}
+[data-theme="sticker"] main .break-inside-avoid {
+  background: #fff;
+  border: none !important;
+  border-radius: 14px !important;
+  padding: 8px;
+  box-shadow:
+    0 3px 0 #e8dcc8,
+    0 8px 20px rgba(56,49,42,0.06) !important;
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s;
+  position: relative;
+}
+[data-theme="sticker"] main .break-inside-avoid:nth-child(3n+1) { transform: rotate(-1.1deg); }
+[data-theme="sticker"] main .break-inside-avoid:nth-child(3n+2) { transform: rotate(0.7deg); }
+[data-theme="sticker"] main .break-inside-avoid:nth-child(3n)   { transform: rotate(-0.4deg); }
+[data-theme="sticker"] main .break-inside-avoid:hover {
+  transform: rotate(0) translateY(-4px) scale(1.015) !important;
+  box-shadow:
+    0 6px 0 #e8dcc8,
+    0 14px 28px rgba(56,49,42,0.1) !important;
+  z-index: 10;
+}
+/* 米色半透明胶带 */
+[data-theme="sticker"] main .break-inside-avoid::before {
+  content: ""; position: absolute; top: -7px; left: 50%;
+  transform: translateX(-50%) rotate(-3deg);
+  width: 46px; height: 13px;
+  background: rgba(232,220,200,0.75);
+  border: 1px solid rgba(200,180,150,0.35);
+  border-radius: 1px;
+  z-index: 20;
+}
+[data-theme="sticker"] main img { border-radius: 10px !important; }
+[data-theme="sticker"] button[class*="fixed right-10"] {
+  background: #b89b7a !important;
+  box-shadow: 0 4px 14px rgba(184,155,122,0.4) !important;
+}
 
-        /* 强调色：淡香芋紫 */
-        --accent-color: #c4a6e8;
+/* ═══════ 5. CLOTH —— 改"整页装饰" ═══════
+   不是卡片换肤，是整张 app 换物种：顶栏布缝 + 卡片凹陷
+   ═══════════════════════════════════════════ */
+[data-theme="cloth"] {
+  --bg-main: #e7ebe1; --bg-panel: #f2f5ec;
+  --text-main: #3a4232; --text-sub: #86907c;
+  --border-color: transparent; --accent-color: #7a8f6e;
+}
+[data-theme="cloth"] body {
+  background-color: #e7ebe1;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(122,143,110,0.04) 0px, rgba(122,143,110,0.04) 1px, transparent 1px, transparent 4px),
+    repeating-linear-gradient(-45deg, rgba(122,143,110,0.04) 0px, rgba(122,143,110,0.04) 1px, transparent 1px, transparent 4px);
+}
+/* 顶栏改布缝——加虚线底线 */
+[data-theme="cloth"] header {
+  border-bottom: 2px dashed rgba(122,143,110,0.35) !important;
+  background: rgba(242,245,236,0.85) !important;
+  backdrop-filter: blur(10px);
+}
+/* 卡片是"布贴"——内填色，凹陷感，hover 按进去 */
+[data-theme="cloth"] main .break-inside-avoid {
+  border: none !important;
+  border-radius: 20px !important;
+  background: #f2f5ec;
+  box-shadow:
+    inset 0 2px 4px rgba(122,143,110,0.12),
+    inset 0 -1px 0 rgba(255,255,255,0.7),
+    0 2px 8px rgba(122,143,110,0.08) !important;
+  transition: box-shadow 0.25s, transform 0.25s;
+}
+[data-theme="cloth"] main .break-inside-avoid:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 3px 8px rgba(122,143,110,0.16),
+    inset 0 -1px 0 rgba(255,255,255,0.7),
+    0 2px 4px rgba(122,143,110,0.06) !important;
+}
+[data-theme="cloth"] main img {
+  border-radius: 16px 16px 0 0 !important;
+  filter: saturate(0.85) contrast(0.98);
+}
+[data-theme="cloth"] button[class*="fixed right-10"] {
+  background: #7a8f6e !important;
+  border-radius: 20px !important;
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.15),
+    inset 0 -1px 0 rgba(255,255,255,0.2),
+    0 4px 14px rgba(122,143,110,0.35) !important;
+}
+[data-theme="polaroid"] {
+  --bg-main: #eef2f2;
+  --bg-panel: #ffffff;
+  --text-main: #2b3a3a;
+  --text-sub: #8fa0a0;
+  --border-color: transparent;
+  --accent-color: #4a8b8b;
+}
+[data-theme="polaroid"] body {
+  background-color: #eef2f2;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(74,139,139,0.06) 0%, transparent 45%),
+    radial-gradient(circle at 80% 70%, rgba(120,150,180,0.06) 0%, transparent 45%);
+  background-attachment: fixed;
+}
 
-        /* 背景渐变：从“几乎是白色”过渡到“淡淡的香芋紫”，非常通透 */
-        background-image: linear-gradient(135deg, #fdfbfd 0%, #e8dff5 100%);
-        background-attachment: fixed;
-      }
+/* 卡片 = 拍立得相纸 */
+[data-theme="polaroid"] main .break-inside-avoid {
+  background: #ffffff !important;
+  border: none !important;
+  border-radius: 3px !important;
+  padding: 10px 10px 0 10px !important;
+  box-shadow:
+    0 1px 3px rgba(40,60,60,0.1),
+    0 6px 18px rgba(40,60,60,0.08) !important;
+  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s;
+  position: relative;
+}
+/* 微微歪 */
+[data-theme="polaroid"] main .break-inside-avoid:nth-child(3n+1) { transform: rotate(-1.2deg); }
+[data-theme="polaroid"] main .break-inside-avoid:nth-child(3n+2) { transform: rotate(0.9deg); }
+[data-theme="polaroid"] main .break-inside-avoid:nth-child(3n)   { transform: rotate(-0.4deg); }
+[data-theme="polaroid"] main .break-inside-avoid:hover {
+  transform: rotate(0) translateY(-4px) !important;
+  box-shadow:
+    0 4px 10px rgba(40,60,60,0.15),
+    0 18px 40px rgba(40,60,60,0.15) !important;
+  z-index: 10;
+}
 
-      /* Morandi (莫兰迪) */
-      [data-theme="morandi"] {
-        --bg-main: #e0e5df; /* 灰绿 */
-        --bg-panel: #f0f2ef;
-        --text-main: #5f6f65; /* 深灰绿 */
-        --text-sub: #9ca8a3;
-        --border-color: #d1d9d4;
-        --accent-color: #8c9e96;
-      }
-      [data-theme="morandi"] body {
-        background-color: #e0e5df;
-      }
-      /* === 找到这里 (约 133 行) === */
+/* 图片：上边缘留相纸白边 (已由 padding 处理)，下边留白写字 */
+[data-theme="polaroid"] main .break-inside-avoid > div[class*="aspect-"],
+[data-theme="polaroid"] main .break-inside-avoid > .aspect-square {
+  border-radius: 1px !important;
+  overflow: hidden;
+}
+[data-theme="polaroid"] main img {
+  border-radius: 0 !important;
+  /* 照片色，稍微鲜一点 */
+  filter: saturate(1.05) contrast(1.02);
+}
 
-      /* 改为：1. Pure Black (纯黑 - OLED 极致黑) */
-      [data-theme="pure-black"] {
-        --bg-main: #000000; /* 纯黑背景 */
-        --bg-panel: #000000; /* 面板也纯黑 */
-        --text-main: #ffffff; /* 纯白文字 */
-        --text-sub: #666666; /* 深灰辅助字 */
-        --border-color: #333333; /*以此深灰边框来区分卡片 */
-        --accent-color: #ffffff;
-      }
-      /* 纯黑模式不需要 body 额外背景色，默认引用 bg-main 即可 */
+/* 底部信息区 = 手写相纸标签 */
+[data-theme="polaroid"] main .break-inside-avoid > div[class*="p-4"] {
+  background: #fff !important;
+  padding: 14px 4px 18px 4px !important;
+  border: none !important;
+}
+[data-theme="polaroid"] main .break-inside-avoid > div[class*="p-4"] h3 {
+  font-family: "Noto Serif SC", "Kaiti SC", Georgia, serif !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.08em;
+  color: #2b3a3a !important;
+  text-align: center;
+  margin-bottom: 6px;
+}
+/* 标签和日期居中，变小 */
+[data-theme="polaroid"] main .break-inside-avoid > div[class*="p-4"] > div {
+  justify-content: center !important;
+  border-top: none !important;
+  padding-top: 0 !important;
+  margin-top: 4px !important;
+}
+[data-theme="polaroid"] main .break-inside-avoid > div[class*="p-4"] > div span {
+  text-align: center;
+  font-size: 9px !important;
+  color: #8fa0a0 !important;
+}
 
-      /* 2. Sakura (落樱 - 软萌可爱) */
-      [data-theme="sakura"] {
-        --bg-main: #fff0f3; /* 浅粉背景 */
-        --bg-panel: rgba(255, 255, 255, 0.85);
-        --text-main: #5e3a45; /* 巧克力色字体 */
-        --text-sub: #d4a5b0;
-        --border-color: #ffdae2;
-        --accent-color: #ff8fa3; /* 亮粉色点缀 */
-        background-image:
-          radial-gradient(#ffe4e9 20%, transparent 20%),
-          radial-gradient(#ffe4e9 20%, transparent 20%);
-        background-size: 20px 20px;
-        background-position:
-          0 0,
-          10px 10px;
-      }
+/* 悬浮上传按钮：浅青 */
+[data-theme="polaroid"] button[class*="fixed right-10"] {
+  background: #4a8b8b !important;
+  border-radius: 50%;
+  box-shadow: 0 4px 16px rgba(74,139,139,0.4) !important;
+}
+[data-theme="nightfall"] {
+  --bg-main: #16181d;
+  --bg-panel: #1e2128;
+  --text-main: #d8dce4;
+  --text-sub: #7c8595;
+  --border-color: #2a2e37;
+  --accent-color: #a8b8d8;
+}
+[data-theme="nightfall"] body {
+  background: #16181d;
+  background-image:
+    radial-gradient(ellipse at top, rgba(60,70,95,0.25) 0%, transparent 60%),
+    radial-gradient(ellipse at bottom, rgba(40,45,60,0.3) 0%, transparent 60%);
+  background-attachment: fixed;
+}
 
-      /* 3. Cyan (青黛 - 国风雅韵) */
-      [data-theme="cyan"] {
-        --bg-main: #f2f5f4; /* 极淡青灰 */
-        --bg-panel: #ffffff;
-        --text-main: #2b4541; /* 深青黛色 */
-        --text-sub: #8faeb0;
-        --border-color: #dae3e1;
-        --accent-color: #4a7570;
-      }
-      [data-theme="cyan"] body {
-        background: linear-gradient(to bottom, #f2f5f4, #e6ebe9);
-        background-attachment: fixed;
-      }
+/* 卡片 */
+[data-theme="nightfall"] main .break-inside-avoid {
+  background: #1e2128 !important;
+  border: 1px solid #2a2e37 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+}
+[data-theme="nightfall"] main .break-inside-avoid:hover {
+  transform: translateY(-2px);
+  border-color: #3d4350 !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
+}
+[data-theme="nightfall"] main img {
+  border-radius: 10px 10px 0 0 !important;
+  /* 夜间给图片一点点冷调，防刺眼 */
+  filter: brightness(0.92) contrast(0.98);
+}
+[data-theme="nightfall"] main .break-inside-avoid:hover img {
+  filter: brightness(1) contrast(1);
+}
 
-      /* === 在 <style> 标签内，接着原来的主题往下写 === */
+/* 暗色控件适配 */
+[data-theme="nightfall"] .bg-gray-50,
+[data-theme="nightfall"] .bg-gray-100,
+[data-theme="nightfall"] .bg-white {
+  background-color: #1e2128 !important;
+  color: #d8dce4 !important;
+}
+[data-theme="nightfall"] input[type="text"],
+[data-theme="nightfall"] input[type="password"],
+[data-theme="nightfall"] input[type="email"],
+[data-theme="nightfall"] textarea {
+  background-color: #262a33 !important;
+  color: #d8dce4 !important;
+  border-color: #343a46 !important;
+}
+[data-theme="nightfall"] input::placeholder,
+[data-theme="nightfall"] textarea::placeholder {
+  color: #5c6575 !important;
+}
 
-      /* 1. 杂志风 (Magazine) - 高级、衬线体、红黑撞色 */
-      [data-theme="magazine"] {
-        --bg-main: #f2f2f2; /* 浅灰纸张底色 */
-        --bg-panel: #ffffff;
-        --text-main: #1a1a1a; /* 纯黑文字 */
-        --text-sub: #555555;
-        --border-color: #000000; /* 强烈的黑色边框 */
-        --accent-color: #cc3300; /* 杂志红 */
-      }
-      /* 杂志风特有：强制使用衬线字体，营造阅读感 */
-      [data-theme="magazine"] body {
-        font-family: "Noto Serif SC", serif !important;
-      }
-      [data-theme="magazine"] .rounded-full,
-      [data-theme="magazine"] .rounded-lg,
-      [data-theme="magazine"] .rounded {
-        border-radius: 0 !important; /* 杂志风要直角，不要圆角 */
-      }
-      [data-theme="magazine"] header,
-      [data-theme="magazine"] .bg-white {
-        border: 1px solid #000 !important; /* 给卡片加黑边 */
-        box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.1); /* 硬朗的阴影 */
-      }
+/* 悬浮上传按钮：柔和冷青 */
+[data-theme="nightfall"] button[class*="fixed right-10"] {
+  background: #3a4560 !important;
+  box-shadow: 0 4px 20px rgba(58,69,96,0.6) !important;
+}
+[data-theme="nightfall"] button[class*="fixed right-10"]:hover {
+  background: #47536e !important;
+}
 
-      /* 2. 奶油风 (Cream) - 萌系、软糯、暖黄 */
-      [data-theme="cream"] {
-        --bg-main: #fffbf0; /* 暖黄奶油色 */
-        --bg-panel: #ffffff;
-        --text-main: #5d4037; /* 巧克力色文字 */
-        --text-sub: #a1887f;
-        --border-color: #fae3d9;
-        --accent-color: #ffab91; /* 蜜桃色 */
-      }
-      [data-theme="cream"] body {
-        background-image: radial-gradient(#ffe0b2 20%, transparent 20%);
-        background-size: 20px 20px; /* 波点背景 */
-      }
-      [data-theme="cream"] .rounded-lg,
-      [data-theme="cream"] img {
-        border-radius: 20px !important; /* 增加圆润度 */
-      }
+/* 顶栏 */
+[data-theme="nightfall"] header {
+  background: rgba(30,33,40,0.85) !important;
+  border-bottom: 1px solid #2a2e37 !important;
+}
 
-      /* === 找到这里 (约 214 行) === */
+/* ═══════ 全局 ═══════ */
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: var(--font, Inter, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: background-color 0.35s ease, color 0.35s ease;
+}
+h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif); }
 
-      /* 改为：3. Deep Sea (深海 - 保留原来的深蓝色) */
-      [data-theme="deep-sea"] {
-        --bg-main: #0f172a; /* 深蓝黑 */
-        --bg-panel: rgba(30, 41, 59, 0.7); /* 半透明深色玻璃 */
-        --text-main: #f8fafc; /* 亮白 */
-        --text-sub: #94a3b8; /* 蓝灰 */
-        --border-color: #334155;
-        --accent-color: #38bdf8; /* 天蓝高亮 */
-      }
-      [data-theme="deep-sea"] body {
-        background: linear-gradient(to bottom, #0f172a, #1e293b);
-        background-attachment: fixed;
-      }
-
-      /* 5. Paper (羊皮卷 - 阅读质感) */
-      [data-theme="paper"] {
-        --bg-main: #f7f3e8; /* 暖黄纸张色 */
-        --bg-panel: #fdfbf7;
-        --text-main: #3c3836; /* 墨黑 */
-        --text-sub: #928374;
-        --border-color: #e6dfc9;
-        --accent-color: #b85c39; /* 印泥红 */
-      }
-      /* === 新增主题结束 === */
-
-      /* Pixel (像素风) */
-      [data-theme="pixel"] {
-        --bg-main: #d0d0d0;
-        --bg-panel: #ffffff;
-        --text-main: #000000;
-        --text-sub: #555555;
-        --border-color: #000000;
-        --accent-color: #0000ff;
-      }
-      [data-theme="pixel"] body {
-        font-family:
-          "Press Start 2P", cursive !important; /* 强制全站像素字体 */
-        background-image: radial-gradient(#000 1px, transparent 1px);
-        background-size: 20px 20px;
-        background-color: #e0e0e0;
-      }
-      /* 像素风特殊样式：移除圆角，增加黑边 */
-      [data-theme="pixel"] .rounded-full,
-      [data-theme="pixel"] .rounded-lg,
-      [data-theme="pixel"] .rounded-xl,
-      [data-theme="pixel"] .rounded,
-      [data-theme="pixel"] input,
-      [data-theme="pixel"] button,
-      [data-theme="pixel"] img {
-        border-radius: 0 !important;
-      }
-      /* 让像素风卡片有更明显的黑边 */
-      [data-theme="pixel"] .border {
-        border-width: 2px !important;
-      }
-      [data-theme="pixel"] .fullscreen-layer,
-      [data-theme="pixel"] header {
-        border-bottom: 2px solid #000 !important;
-      }
-      [data-theme="pixel"] input {
-        border: 2px solid #000 !important;
-      }
-      body {
-        background-color: var(--bg-main);
-        color: var(--text-main);
-        -webkit-font-smoothing: antialiased;
-        transition:
-          background-color 0.5s ease,
-          color 0.5s ease;
-        -moz-osx-font-smoothing: grayscale;
-        -webkit-tap-highlight-color: transparent;
-        user-select: none;
-      }
       header {
         padding-top: env(safe-area-inset-top);
       }
@@ -1878,7 +2110,7 @@
                     class="w-full bg-gray-50 px-4 py-3 text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-black transition-all"
                     @input="showTagList = true"
                     @focus="showTagList = true"
-                    @blur="setTimeout(() => showTagList = false, 200)"
+                    @blur="hideTagList"
                   />
 
                   <!-- 联想菜单下拉列表 -->
@@ -2082,6 +2314,30 @@
                     >归档至相册</span
                   >
                 </label>
+                  <!-- === 【新增】相册图片压缩开关 === -->
+  <div class="mt-3 bg-gray-50 border border-gray-100 rounded p-3 space-y-2">
+    <label class="flex items-center gap-2 cursor-pointer select-none">
+      <input type="checkbox" v-model="uploadForm.compressEnabled" class="accent-green-500 w-3 h-3" />
+      <span class="text-[10px] tracking-widest text-gray-600 font-bold">压缩图片（节省带宽）</span>
+    </label>
+    <div v-if="uploadForm.compressEnabled" class="flex items-center gap-3">
+      <div class="flex-1">
+        <div class="flex justify-between text-[9px] text-gray-400 mb-1">
+          <span>最长边</span><span>{{ uploadForm.compressMaxSide }}px</span>
+        </div>
+        <input type="range" v-model.number="uploadForm.compressMaxSide" min="720" max="2560" step="160"
+          class="w-full accent-black h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+      </div>
+      <div class="flex-1">
+        <div class="flex justify-between text-[9px] text-gray-400 mb-1">
+          <span>质量</span><span>{{ Math.round(uploadForm.compressQuality * 100) }}%</span>
+        </div>
+        <input type="range" v-model.number="uploadForm.compressQuality" min="0.5" max="0.95" step="0.05"
+          class="w-full accent-black h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+      </div>
+    </div>
+  </div>
+  <!-- === 新增结束 === -->
                 <!-- === 修改开始：相册输入框改为带联想功能的结构 === -->
                 <div v-if="uploadForm.useAlbum" class="relative group/album-input mt-3">
                   <input
@@ -2091,7 +2347,7 @@
                     class="w-full border-b border-gray-200 py-2 text-xs focus:border-black outline-none bg-transparent"
                     @input="showAlbumList = true"
                     @focus="showAlbumList = true"
-                    @blur="setTimeout(() => showAlbumList = false, 200)"
+                    @blur="hideAlbumList"
                   />
                   <!-- 联想菜单下拉列表 -->
                   <div
@@ -2184,6 +2440,35 @@
                     >自动识别配色、预览图和源文件</span
                   >
                 </div>
+                  <!-- === 【新增】美化压缩开关 + 预览图存储路由说明 === -->
+  <div class="bg-gray-50 border border-gray-100 rounded p-3 space-y-2">
+    <label class="flex items-center gap-2 cursor-pointer select-none">
+      <input type="checkbox" v-model="uploadForm.compressEnabled" class="accent-green-500 w-3 h-3" />
+      <span class="text-[10px] tracking-widest text-gray-600 font-bold">压缩预览图（节省带宽）</span>
+    </label>
+    <p class="text-[9px] text-gray-400 leading-relaxed">
+      实际源文件<span class="text-black font-bold">不会压缩</span>，保证下载质量。<br />
+      预览图优先存入<span class="text-black font-bold">{{ configB.url ? '备用库' : '主库' }}</span>；
+      实际文件始终存主库。
+    </p>
+    <div v-if="uploadForm.compressEnabled" class="flex items-center gap-3">
+      <div class="flex-1">
+        <div class="flex justify-between text-[9px] text-gray-400 mb-1">
+          <span>最长边</span><span>{{ uploadForm.compressMaxSide }}px</span>
+        </div>
+        <input type="range" v-model.number="uploadForm.compressMaxSide" min="720" max="2560" step="160"
+          class="w-full accent-black h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+      </div>
+      <div class="flex-1">
+        <div class="flex justify-between text-[9px] text-gray-400 mb-1">
+          <span>质量</span><span>{{ Math.round(uploadForm.compressQuality * 100) }}%</span>
+        </div>
+        <input type="range" v-model.number="uploadForm.compressQuality" min="0.5" max="0.95" step="0.05"
+          class="w-full accent-black h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+      </div>
+    </div>
+  </div>
+  <!-- === 新增结束 === -->
                 <div
                   v-for="(item, index) in uploadForm.beautifyVariations"
                   :key="index"
@@ -2316,36 +2601,23 @@
                 &times;
               </button>
             </div>
+<div class="grid grid-cols-1 gap-2 max-h-[58vh] overflow-y-auto custom-scrollbar pr-1">
+  <button
+    v-for="t in themeOptions"
+    :key="t.key"
+    @click="setTheme(t.key)"
+    class="flex items-center gap-4 p-3 border border-transparent hover:border-border transition-all shrink-0"
+    :class="{'bg-gray-50 border-border': currentTheme === t.key}"
+  >
+    <div class="w-9 h-9 rounded-md shrink-0" :style="t.previewStyle"></div>
+    <div class="text-left min-w-0 flex-1">
+      <div class="text-xs font-bold text-black uppercase tracking-wider truncate">{{ t.name }}</div>
+      <div class="text-[9px] text-sub truncate">{{ t.desc }}</div>
+    </div>
+    <div v-if="currentTheme === t.key" class="text-black text-xs shrink-0">●</div>
+  </button>
+</div>
 
-            <div class="grid grid-cols-1 gap-4">
-              <button
-                v-for="t in themeOptions"
-                :key="t.key"
-                @click="setTheme(t.key)"
-                class="flex items-center gap-4 p-3 border border-transparent hover:border-border transition-all group"
-                :class="{'bg-gray-50 border-border': currentTheme === t.key}"
-              >
-                <!-- 预览圆点 -->
-                <div
-                  class="w-8 h-8 rounded-full shadow-inner border border-black/5"
-                  :style="t.previewStyle"
-                ></div>
-                <div class="text-left">
-                  <div
-                    class="text-xs font-bold text-black uppercase tracking-wider"
-                  >
-                    {{ t.name }}
-                  </div>
-                  <div class="text-[9px] text-sub">{{ t.desc }}</div>
-                </div>
-                <div
-                  v-if="currentTheme === t.key"
-                  class="ml-auto text-black text-xs"
-                >
-                  ●
-                </div>
-              </button>
-            </div>
           </div>
         </div>
         <!-- === 【新增】数据迁移模态框 === -->
@@ -2439,6 +2711,48 @@
 
     <script>
       const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+      /* ========== 图片压缩工具 ========== */
+// 用 canvas 把图片压成 jpeg/webp，返回 File 对象
+const compressImage = (file, maxSide = 1600, quality = 0.8, mime = 'image/jpeg') => {
+  return new Promise((resolve, reject) => {
+    // 非图片直接返回
+    if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.type === 'image/svg+xml') {
+      return resolve(file);
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      // 等比缩放
+      if (width > maxSide || height > maxSide) {
+        const ratio = Math.min(maxSide / width, maxSide / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      // jpeg 需要白底，避免透明变黑
+      if (mime === 'image/jpeg') {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, width, height);
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (!blob) return resolve(file);
+        // 压缩后反而变大，就用原图
+        if (blob.size >= file.size) return resolve(file);
+        const newName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+        resolve(new File([blob], newName, { type: mime }));
+      }, mime, quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+};
+
 
       createApp({
         setup() {
@@ -2452,77 +2766,34 @@
           const items = ref([]);
           const showThemeModal = ref(false);
           const currentTheme = ref("default");
+const themeOptions = [
+  { key: "default", name: "Gallery", desc: "素白 / 基线",
+    previewStyle: "background:#fcfcfc;border:1px solid #f0f0f0" },
+  { key: "album",   name: "Album",   desc: "相册内页 / 横排缩略图 / 分割线",
+    previewStyle: "background:#fff;background-image:radial-gradient(circle at 18% 50%,#e5e5ea 9px,transparent 9px),radial-gradient(circle at 68% 50%,#e5e5ea 9px,transparent 9px);border-bottom:1px solid #e5e5ea;border-radius:0" },
+  { key: "paper",   name: "Paper",   desc: "文件卡 / 图脚注 / 编号式标题",
+    previewStyle: "background:#fff;border:1px solid #e0d8c8;border-radius:0;box-shadow:0 1px 2px rgba(0,0,0,.06)" },
+  { key: "glass",   name: "Glass",   desc: "磨砂玻璃 / 透出渐变 / 内高光",
+    previewStyle: "background:linear-gradient(135deg,#d9e4f5,#f5dfe8);border:1px solid rgba(255,255,255,.85);border-radius:8px;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)" },
+  { key: "sticker", name: "Sticker", desc: "手账贴纸 / 米胶带 / 手绘歪",
+    previewStyle: "background:#fff;border:none;border-radius:8px;box-shadow:0 3px 0 #e8dcc8;transform:rotate(-5deg)" },
+  { key: "cloth",   name: "Cloth",   desc: "毛布 / 顶栏布缝 / 凹陷质感",
+    previewStyle: "background:#f2f5ec;border:none;border-radius:10px;box-shadow:inset 0 2px 4px rgba(122,143,110,.15)" },
+    {
+  key: "polaroid",
+  name: "Polaroid",
+  desc: "拍立得 / 相纸白边 / 微歪",
+  previewStyle: "background:#fff;border:none;border-radius:1px;box-shadow:0 1px 3px rgba(40,60,60,.15);transform:rotate(-4deg);padding:2px",
+},
+{
+  key: "nightfall",
+  name: "Nightfall",
+  desc: "夜间 / 深靛 / 暖灰字",
+  previewStyle: "background:linear-gradient(180deg,#1e2128,#16181d);border:1px solid #2a2e37;border-radius:4px",
+},
 
-          const themeOptions = [
-            {
-              key: "default",
-              name: "Original",
-              desc: "极简素白 / 经典风格",
-              previewStyle: "background: #FCFCFC; border: 1px solid #eee",
-            },
-            {
-              key: "pure-black",
-              name: "Pure Black",
-              desc: "纯黑 / OLED / 极致对比",
-              previewStyle: "background: #000000; border: 1px solid #333",
-            },
-            {
-              key: "sakura",
-              name: "Sakura",
-              desc: "落樱 / 软萌粉色 / 少女心",
-              previewStyle: "background: #fff0f3; border: 1px solid #ffdae2",
-            },
-            {
-              key: "cyan",
-              name: "Cyan",
-              desc: "青黛 / 国风雅韵 / 陶瓷质感",
-              previewStyle: "background: #f2f5f4; border: 1px solid #dae3e1",
-            },
-            {
-              key: "paper",
-              name: "Paper",
-              desc: "羊皮卷 / 温暖阅读 / 复古",
-              previewStyle: "background: #f7f3e8",
-            },
-            {
-              key: "lavender",
-              name: "Lavender",
-              desc: "迷幻紫 / 梦境氛围",
-              previewStyle:
-                "background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)",
-            },
-            {
-              key: "morandi",
-              name: "Morandi",
-              desc: "莫兰迪 / 灰绿冷淡风",
-              previewStyle: "background: #E0E5DF",
-            },
-            {
-              key: "magazine",
-              name: "Magazine",
-              desc: "Vogue / 杂志排版 / 衬线体",
-              previewStyle: "background: #f2f2f2; border: 1px solid #000;",
-            },
-            {
-              key: "cream",
-              name: "Cream Puff",
-              desc: "奶油泡芙 / 软萌 / 治愈系",
-              previewStyle: "background: #fffbf0; border: 2px solid #fff;",
-            },
-            {
-              key: "deep-sea",
-              name: "Deep Sea",
-              desc: "深海 / 蓝调暗夜 / 沉浸",
-              previewStyle: "background: #0f172a",
-            },
-            {
-              key: "pixel",
-              name: "8-Bit",
-              desc: "像素风 / 街机游戏",
-              previewStyle:
-                "background: #d0d0d0; background-image: radial-gradient(#000 1px, transparent 1px); background-size: 4px 4px;",
-            },
-          ];
+];
+
           const filter = ref("all");
           // --- 新增搜索相关变量 ---
           const searchInput = ref(""); 
@@ -2765,6 +3036,9 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
           const uploadForm = ref({
             type: "text",
             targetStorage: "auto", 
+  compressEnabled: true,       // 默认开启压缩（用户可关）
+  compressMaxSide: 1920,
+  compressQuality: 0.8,
             category: "",
             title: "",
             url: "",
@@ -2863,6 +3137,17 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
               })
               .slice(0, 10); // 最多显示10个
           });
+// === 【新增】避免模板里直接调用全局 setTimeout ===
+const hideTagList = () => {
+  window.setTimeout(() => {
+    showTagList.value = false;
+  }, 200);
+};
+const hideAlbumList = () => {
+  window.setTimeout(() => {
+    showAlbumList.value = false;
+  }, 200);
+};
 
           // 3. 点击联想词填入
           const applyTagSuggestion = (tag) => {
@@ -3004,6 +3289,73 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
           };
 
           let supabase = null;
+// === 【新增】图片压缩工具 ===
+// 返回一个 File 对象（若无需压缩则返回原文件）
+const compressImage = (file, opts = {}) => {
+  return new Promise((resolve, reject) => {
+    // 只压缩图片
+    if (!file || !file.type.startsWith("image/")) return resolve(file);
+    // GIF / SVG 不处理（会丢失动画或矢量）
+    if (file.type === "image/gif" || file.type === "image/svg+xml") {
+      return resolve(file);
+    }
+
+    const maxSide = opts.maxSide || 1920;   // 最长边像素
+    const quality = opts.quality ?? 0.8;    // JPEG 质量 0~1
+    const mime = opts.mime || "image/jpeg";
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+
+      // 按最长边等比缩放
+      const scale = Math.min(1, maxSide / Math.max(width, height));
+      const newW = Math.round(width * scale);
+      const newH = Math.round(height * scale);
+
+      // 如果本身就小于目标尺寸、且不是 PNG 转 JPEG 优化场景，直接返回原图
+      if (scale === 1 && file.size < 300 * 1024 && file.type === mime) {
+        return resolve(file);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = newW;
+      canvas.height = newH;
+      const ctx = canvas.getContext("2d");
+
+      // JPEG 无透明，用白底防止 PNG 透明区域变黑
+      if (mime === "image/jpeg") {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, newW, newH);
+      }
+      ctx.drawImage(img, 0, 0, newW, newH);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return resolve(file); // 压缩失败则回退原图
+          // 如果压缩后反而更大，也不替换
+          if (blob.size >= file.size) return resolve(file);
+          // 保留原文件名，改后缀
+          const baseName = file.name.replace(/\.[^.]+$/, "");
+          const newFile = new File([blob], `${baseName}.jpg`, {
+            type: mime,
+            lastModified: Date.now(),
+          });
+          resolve(newFile);
+        },
+        mime,
+        quality,
+      );
+    };
+    img.onerror = (e) => {
+      URL.revokeObjectURL(url);
+      resolve(file); // 加载失败就用原图，避免卡住流程
+    };
+    img.src = url;
+  });
+};
 
           // 找到原有的 formatDate 函数，替换为：
           const formatDate = (str) => {
@@ -4635,6 +4987,10 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
             // 3. 填入通用表单数据
             uploadForm.value = {
               type: item.type,
+                targetStorage: "auto",
+  compressEnabled: true,      // <--- 新增
+  compressMaxSide: 1920,      // <--- 新增
+  compressQuality: 0.8,       // <--- 新增
               category: item.category || "", // 把旧标签填回去！
               // 下面是修改后的逻辑：美化类型要读取解析后的 title
               title: isBeautify
@@ -4743,6 +5099,25 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
               return window.supabaseB.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
             }
           };
+// === 【新增】美化预览图专用上传：有备用库就走备用，没有就主库 ===
+const uploadPreviewImage = async (file, fileName, options = {}) => {
+  // 有备用库 → 优先备用
+  if (window.supabaseB) {
+    try {
+      const { error } = await window.supabaseB.storage
+        .from("uploads")
+        .upload(fileName, file, options);
+      if (!error) {
+        return window.supabaseB.storage.from("uploads").getPublicUrl(fileName).data.publicUrl;
+      }
+      console.warn("预览图备用库上传失败，回退主库:", error.message);
+    } catch (e) {
+      console.warn("预览图备用库异常，回退主库:", e.message);
+    }
+  }
+  // 无备用库或备用失败 → 主库
+  return await uploadToStorage(file, fileName, options);
+};
 
           // === 【加强版】智能降级 TUS 断点续传 (支持强制走备用库) ===
           const uploadWithTus = (file, fileName) => {
@@ -4936,43 +5311,58 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
                 payload.file_url = url;
               }
 
-              // --- D. 美化包逻辑 ---
-              else if (type === "beautify") {
-                if (!beautifyVariations || beautifyVariations.length === 0)
-                  throw new Error("请至少添加一种配色方案");
+else if (type === "beautify") {
+  if (!beautifyVariations || beautifyVariations.length === 0)
+    throw new Error("请至少添加一种配色方案");
 
-                const variations = [];
-                for (const v of beautifyVariations) {
-                  let previewUrl = v.previewUrl;
-                  if (v.previewFile) {
-                    const pExt = v.previewFile.name.split(".").pop();
-                    const pName = `beautify_prev_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${pExt}`;
-                    previewUrl = await uploadToStorage(v.previewFile, pName);
-                  }
+  // 压缩参数
+  const compOpts = {
+    maxSide: uploadForm.value.compressMaxSide || 1920,
+    quality: uploadForm.value.compressQuality ?? 0.8,
+  };
+  const doCompress = uploadForm.value.compressEnabled;
 
-                  let realUrl = v.realUrl;
-                  if (v.realFile) {
-                    const fExt = v.realFile.name.split(".").pop();
-                    const fName = `beautify_file_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fExt}`;
-                    if (v.realFile.size > 6 * 1024 * 1024) {
-                      realUrl = await uploadWithTus(v.realFile, fName);
-                    } else {
-                      realUrl = await uploadToStorage(v.realFile, fName);
-                    }
-                  }
-                  variations.push({
-                    name: v.colorValue,
-                    color: v.colorValue,
-                    preview: previewUrl,
-                    file: realUrl,
-                  });
-                }
-                payload.content = JSON.stringify({
-                  title: title || "未命名主题",
-                  variations: variations,
-                });
-                payload.file_url = variations[0].preview;
-              }
+  const variations = [];
+  for (const v of beautifyVariations) {
+    // --- 预览图：可选压缩 + 优先备用库 ---
+    let previewUrl = v.previewUrl;
+    if (v.previewFile) {
+      let prevFile = v.previewFile;
+      if (doCompress) {
+        prevFile = await compressImage(prevFile, { ...compOpts, maxSide: Math.min(compOpts.maxSide, 1280) });
+      }
+      // 压缩后统一变 .jpg（compressImage 内部已改文件名，这里仅取后缀）
+      const pExt = (prevFile.name.split(".").pop() || "jpg").toLowerCase();
+      const pName = `beautify_prev_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${pExt}`;
+      // 【关键】预览图走专用函数 → 备用库优先
+      previewUrl = await uploadPreviewImage(prevFile, pName);
+    }
+
+    // --- 实际文件：不压缩 + 始终主库 ---
+    let realUrl = v.realUrl;
+    if (v.realFile) {
+      const fExt = v.realFile.name.split(".").pop();
+      const fName = `beautify_file_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fExt}`;
+      if (v.realFile.size > 6 * 1024 * 1024) {
+        realUrl = await uploadWithTus(v.realFile, fName);
+      } else {
+        realUrl = await uploadToStorage(v.realFile, fName);
+      }
+    }
+    variations.push({
+      name: v.colorValue,
+      color: v.colorValue,
+      preview: previewUrl,
+      file: realUrl,
+    });
+  }
+  payload.content = JSON.stringify({
+    title: title || "未命名主题",
+    variations: variations,
+  });
+  payload.file_url = variations[0].preview;
+}
+
 
               // --- E. 其他通用类型 (Image/Chat/Html) 标题处理 ---
               else {
@@ -5038,28 +5428,32 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
                       ? uploadForm.value.files
                       : files;
 
-                  await Promise.all(
-                    filesToUpload.map(async (f) => {
-                      const ext = f.name.split(".").pop();
-                      const fname = `${Date.now()}-${Math.random().toString(36).substr(2, 5)}.${ext}`;
+await Promise.all(
+  filesToUpload.map(async (f) => {
+    let uploadFile = f;
 
-                      // --- 替换为这段新代码 ---
-                      let filePublicUrl = ""; // 新增一个变量来接收真实的图片链接
+    // === 【新增】仅对相册图片（image 类型）做可选压缩，不影响字体/HTML/聊天 ===
+    if (type === "image" && uploadForm.value.compressEnabled) {
+      uploadFile = await compressImage(f, {
+        maxSide: uploadForm.value.compressMaxSide || 1920,
+        quality: uploadForm.value.compressQuality ?? 0.8,
+      });
+    }
 
-                      if (f.size > 6 * 1024 * 1024) {
-                        // 如果大于 6MB 用断点续传（智能版）
-                        filePublicUrl = await uploadWithTus(f, fname);
-                      } else {
-                        // 小文件用标准上传（智能版）
-                        const contentType =
-                          ext === "html"
-                            ? "text/html"
-                            : ext === "ttf" || ext === "otf" || ext === "woff"
-                              ? "font/" + ext
-                              : undefined;
-                        // 调用我们刚才写的自动切换库的函数
-                        filePublicUrl = await uploadToStorage(f, fname, { contentType });
-                      }
+    // 用压缩后的真实文件名和后缀
+    const finalExt = (uploadFile.name.split(".").pop() || "bin").toLowerCase();
+    const fname = `${Date.now()}-${Math.random().toString(36).substr(2, 5)}.${finalExt}`;
+
+    let filePublicUrl = "";
+    if (uploadFile.size > 6 * 1024 * 1024) {
+      filePublicUrl = await uploadWithTus(uploadFile, fname);
+    } else {
+      const contentType =
+        finalExt === "html" ? "text/html"
+        : finalExt === "ttf" || finalExt === "otf" || finalExt === "woff" ? "font/" + finalExt
+        : undefined;
+      filePublicUrl = await uploadToStorage(uploadFile, fname, { contentType });
+    }
 
                       // 插入每张图片的记录 (永远插入主库的数据库)
                       return supabase.from("fragments").insert({
@@ -5085,6 +5479,10 @@ if (uB && kB) configB.value.key = kB; // <--- 新增
               // 重置表单
               uploadForm.value = {
                 type: "text",
+                  targetStorage: "auto",
+  compressEnabled: true,      // <--- 新增
+  compressMaxSide: 1920,      // <--- 新增
+  compressQuality: 0.8,       // <--- 新增
                 category: "",
                 title: "",
                 url: "",
@@ -5385,6 +5783,8 @@ const handleRoleJsonUpload = async (e) => {
             quoteCanvas,
             isBatchMode,
             selectedIds,
+            hideTagList,
+hideAlbumList,
             toggleBatchMode,
             toggleSelection,
             selectAllFiltered,
