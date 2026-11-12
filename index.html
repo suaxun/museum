@@ -3394,15 +3394,22 @@ h1, h2, h3, .font-serif { font-family: var(--font-title, "Noto Serif SC", serif)
     </div>
 
     <!-- 底部按钮 -->
-    <div class="p-6 border-t border-gray-100 bg-gray-50 flex gap-3">
-      <button @click="showR2Migration = false" :disabled="isR2Migrating"
+    <div class="p-6 border-t border-gray-100 bg-gray-50 flex flex-wrap gap-3">
+      <button @click="showR2Migration = false" :disabled="isR2Migrating || isCleaningOrphans"
         class="flex-1 py-3 border border-gray-200 text-gray-600 text-[10px] font-bold tracking-widest rounded hover:bg-white transition">
-        取消
+        关闭
+      </button>
+      <!-- 👇 新增：专门给已经迁移完的用户一键清理 Supabase 残留源文件 👇 -->
+      <button @click="cleanOrphanedSupabaseFiles"
+        :disabled="isR2Migrating || isCleaningOrphans"
+        class="flex-[1.5] py-3 border border-red-200 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white text-[10px] font-bold tracking-widest rounded transition-all"
+        title="扫描并删除已经迁移到 R2、但仍残留在 Supabase 桶里的旧源文件">
+        {{ isCleaningOrphans ? '正在扫描清理...' : '🧹 清理已迁移的残留源文件' }}
       </button>
       <button @click="startR2Migration"
-        :disabled="isR2Migrating || r2SelectedIds.length === 0"
+        :disabled="isR2Migrating || isCleaningOrphans || r2SelectedIds.length === 0"
         class="flex-[2] py-3 text-white text-[10px] font-bold tracking-[0.2em] uppercase rounded shadow-lg transition-all"
-        :class="isR2Migrating ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'">
+        :class="(isR2Migrating || r2SelectedIds.length === 0) ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'">
         {{ isR2Migrating ? `迁移中 (${r2Progress}/${r2SelectedIds.length})...` : `开始迁移 ${r2SelectedIds.length} 项到 R2` }}
       </button>
     </div>
@@ -4339,11 +4346,13 @@ const hideAlbumList = () => {
             session.value = { user: { id: "r2_emergency_user" }, access_token: "mock" };
             await fetchData();
           };
-
           // 等 Supabase 解封恢复后，点击【⚡ 合并应急数据】一键同步回真实 Supabase！
           const mergeEmergencyToSupabase = async () => {
             const list = getEmergencyDB();
-            if (list.length === 0) return alert("没有待合并的应急数据！");
+            if (list.length === 0) {
+              emergencyPendingCount.value = 0;
+              return alert("没有待合并的应急数据！");
+            }
             if (!confirm(`检测到你在应急模式下存入了 ${list.length} 条记录（文件已在 R2 中）。\n是否现在一键合并写入你的 Supabase 数据库？`)) return;
 
             loading.value = true;
@@ -4363,9 +4372,14 @@ const hideAlbumList = () => {
               const { error } = await supabase.from("fragments").insert(rowsToInsert);
               if (error) throw error;
 
-              // 合并成功后清空本地应急缓存
+              // 【核心修复1】：不仅清空本地缓存，同时把空数组同步覆盖到 R2 云端并删除备份文件，防止死灰复燃！
+              await saveEmergencyDB([]);
               localStorage.removeItem(EMERGENCY_STORAGE_KEY);
               emergencyPendingCount.value = 0;
+              try {
+                await r2Delete(["museum_emergency_backup.json"]);
+              } catch (e) {}
+
               alert(`🎉 成功将 ${rowsToInsert.length} 条记录合并回 Supabase！`);
               await fetchData();
             } catch (e) {
@@ -4374,6 +4388,7 @@ const hideAlbumList = () => {
               loading.value = false;
             }
           };
+
 
 // === 【新增】图片压缩工具 ===
 // 返回一个 File 对象（若无需压缩则返回原文件）
@@ -4954,33 +4969,36 @@ localStorage.setItem("r2_worker", configR2.value.workerUrl.trim());
 // ============ R2 迁移功能 ============
 const showR2Migration = ref(false);
 const isR2Migrating = ref(false);
+const isCleaningOrphans = ref(false); // 新增：清理孤儿文件状态
 const r2ScanDone = ref(false);
 const r2Candidates = ref([]);     // 待迁移项目
 const r2SelectedIds = ref([]);    // 已选中的 key
 const r2Logs = ref([]);
 const r2Progress = ref(0);
 const r2Options = ref({
-  deleteAfter: false,
+  deleteAfter: true,          // 【修复】默认开启迁移后删除 Supabase 源文件
   alsoMigrateEmbedded: true,
 });
 
-// 从 item 中提取所有 Supabase 文件 URL
+// 从 item 中提取所有 Supabase 文件 URL（修复末尾斜杠及 URL 匹配问题）
 const extractSupabaseUrls = (item) => {
   const urls = new Set();
-  const supabasePrefix = config.value.url.trim() + "/storage/v1/object/public/uploads/";
+  const baseUrl = config.value.url.trim().replace(/\/$/, "");
+  const supabasePrefix = baseUrl + "/storage/v1/object/public/uploads/";
 
   // 1. 主 file_url
-  if (item.file_url && item.file_url.includes(supabasePrefix)) {
-    urls.add(item.file_url);
+  if (item.file_url && item.file_url.includes("/storage/v1/object/public/uploads/")) {
+    if (item.file_url.startsWith(baseUrl)) {
+      urls.add(item.file_url);
+    }
   }
 
   // 2. content 里嵌入的 URL（角色卡 history 的 png/json/qr，美化 variations 的 preview/file 等）
   if (item.content && typeof item.content === "string") {
-    // 简单粗暴：正则找所有 Supabase 链接
     const regex = /https?:\/\/[^\s"'\\<>)]+\/storage\/v1\/object\/public\/uploads\/[^\s"'\\<>)]+/g;
     const matches = item.content.match(regex) || [];
     matches.forEach((u) => {
-      if (u.includes(supabasePrefix)) urls.add(u);
+      if (u.startsWith(baseUrl)) urls.add(u);
     });
   }
   return Array.from(urls);
@@ -4994,20 +5012,20 @@ const openR2Migration = async () => {
   r2SelectedIds.value = [];
   r2Logs.value = [];
 
-  if (!r2.value && !initR2()) {
+  if (!r2.value && !initR2() && !configR2.value.workerUrl) {
     alert("R2 未配置，请先在登录页填入 R2 信息后重新登录");
     showR2Migration.value = false;
     return;
   }
 
-  // 扫描 items 里所有引用 Supabase 的项
-  const supabaseUrl = config.value.url.trim();
+  // 扫描前先刷新一次最新数据库数据，确保不会扫到旧缓存
+  await fetchData();
+
   const candidates = [];
   for (const item of items.value) {
     const urls = extractSupabaseUrls(item);
     if (urls.length === 0) continue;
 
-    // 用 item.id 作为候选 key（一个 item 可能含多个文件）
     candidates.push({
       key: `item_${item.id}`,
       itemId: item.id,
@@ -5041,21 +5059,16 @@ const r2SelectImagesOnly = () => {
 
 // 从 URL 下载并上传到 R2，返回 R2 新 URL
 const migrateUrlToR2 = async (oldUrl) => {
-  // 提取文件名（保持原路径结构，但放到 r2 桶根目录下）
   const urlObj = new URL(oldUrl);
   const pathParts = urlObj.pathname.split("/");
-  const fileName = pathParts[pathParts.length - 1];
-  // 加上时间戳前缀防止冲突（如果同名文件覆盖也 OJBK，但我们保守起见）
-  // 更好做法：保留原文件名，去掉目录（因为我们不知道原目录结构）
+  const fileName = decodeURIComponent(pathParts[pathParts.length - 1]);
   const key = fileName;
 
-  // 下载
   r2Logs.value.unshift(`  ↓ 下载: ${fileName}`);
   const res = await fetch(oldUrl);
   if (!res.ok) throw new Error(`下载失败 ${res.status}`);
   const blob = await res.blob();
 
-  // 上传
   r2Logs.value.unshift(`  ↑ 上传到 R2: ${key} (${(blob.size / 1024).toFixed(0)}KB)`);
   const newUrl = await r2Upload(
     new File([blob], fileName, { type: blob.type }),
@@ -5074,7 +5087,8 @@ const startR2Migration = async () => {
   r2Logs.value = [];
 
   const selected = r2Candidates.value.filter(c => r2SelectedIds.value.includes(c.key));
-  const supabasePrefix = config.value.url.trim() + "/storage/v1/object/public/uploads/";
+  const baseUrl = config.value.url.trim().replace(/\/$/, "");
+  const supabasePrefix = baseUrl + "/storage/v1/object/public/uploads/";
 
   let successCount = 0;
   let failCount = 0;
@@ -5092,11 +5106,10 @@ const startR2Migration = async () => {
         continue;
       }
 
-      // 存储 URL 映射表：旧 URL → 新 URL
       const urlMap = {};
 
-      // 1. 主 file_url（若是 Supabase 的）
-      if (item.file_url && item.file_url.includes(supabasePrefix)) {
+      // 1. 主 file_url
+      if (item.file_url && item.file_url.includes("/storage/v1/object/public/uploads/")) {
         const newUrl = await migrateUrlToR2(item.file_url);
         urlMap[item.file_url] = newUrl;
       }
@@ -5118,7 +5131,6 @@ const startR2Migration = async () => {
       let newFileUrl = item.file_url;
       let newContent = item.content;
 
-      // 使用最长匹配优先，避免部分替换
       const sortedOldUrls = Object.keys(urlMap).sort((a, b) => b.length - a.length);
       for (const oldU of sortedOldUrls) {
         if (newFileUrl) newFileUrl = newFileUrl.split(oldU).join(urlMap[oldU]);
@@ -5126,24 +5138,33 @@ const startR2Migration = async () => {
           newContent = newContent.split(oldU).join(urlMap[oldU]);
         }
       }
-
       const payload = { file_url: newFileUrl, content: newContent };
-      const { error: dbErr } = await supabase
+      // 【关键修复】：加上 .select()，防止 RLS 静默拦截导致“假迁移成功、真删源文件”
+      const { data: updatedRows, error: dbErr } = await supabase
         .from("fragments")
         .update(payload)
-        .eq("id", item.id);
+        .eq("id", item.id)
+        .select();
 
       if (dbErr) throw new Error("更新数据库失败: " + dbErr.message);
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error("数据库拒绝更新链接（RLS 权限不足），已中止删除源文件！");
+      }
 
-      // 4. 删除 Supabase 源文件（如果勾选）
+
+      // 4. 删除 Supabase 源文件（修复 decodeURIComponent 编码问题并检查错误）
       if (r2Options.value.deleteAfter) {
         const keysToDelete = cand.files.map(u => {
           const parts = u.split("/uploads/");
-          return parts.length > 1 ? parts[1].split("?")[0] : null;
+          return parts.length > 1 ? decodeURIComponent(parts[1].split("?")[0]) : null;
         }).filter(Boolean);
+
         if (keysToDelete.length) {
           r2Logs.value.unshift(`  × 删除 Supabase 源文件 (${keysToDelete.length} 个)`);
-          await supabase.storage.from("uploads").remove(keysToDelete);
+          const { error: delErr } = await supabase.storage.from("uploads").remove(keysToDelete);
+          if (delErr) {
+            r2Logs.value.unshift(`  ⚠️ 删除源文件警告: ${delErr.message} (请检查 Storage 是否有 DELETE 权限策略)`);
+          }
         }
       }
 
@@ -5158,13 +5179,108 @@ const startR2Migration = async () => {
   r2Logs.value.unshift(`🎉 迁移结束！成功 ${successCount}，失败 ${failCount}`);
 
   await fetchData(); // 刷新列表
-
-  // 3 秒后关闭
-  setTimeout(() => {
-    isR2Migrating.value = false;
-    showR2Migration.value = false;
-  }, 3000);
+  // 重新扫描更新当前弹窗里的剩余项
+  await openR2Migration();
+  isR2Migrating.value = false;
 };
+
+// 【增强版】：自动过滤虚拟目录 + 小批次删除 + 精准检测 RLS 拦截
+const cleanOrphanedSupabaseFiles = async () => {
+  if (!supabase) return;
+  isCleaningOrphans.value = true;
+  r2Logs.value.unshift(`[${new Date().toLocaleTimeString()}] 🔍 正在扫描 Supabase 'uploads' 存储桶中的所有文件...`);
+
+  try {
+    // 1. 确保拿到最新的数据库记录
+    await fetchData();
+
+    // 2. 收集当前数据库里仍然在使用的所有 Supabase 文件名
+    const usedSupabaseFiles = new Set();
+    for (const item of items.value) {
+      const urls = extractSupabaseUrls(item);
+      urls.forEach(u => {
+        const parts = u.split("/uploads/");
+        if (parts.length > 1) {
+          const cleanName = parts[1].split("?")[0];
+          usedSupabaseFiles.add(decodeURIComponent(cleanName));
+          usedSupabaseFiles.add(cleanName);
+        }
+      });
+    }
+
+    // 3. 分页列出 Supabase 'uploads' 桶中的所有真实文件
+    let allStorageFiles = [];
+    let offset = 0;
+    const limit = 500; // 改用 500 步长，防止触发 Supabase 1000 条截断 Bug
+    while (true) {
+      const { data: fileList, error: listErr } = await supabase.storage
+        .from("uploads")
+        .list("", { limit, offset, sortBy: { column: "name", order: "asc" } });
+
+      if (listErr) throw new Error("读取存储桶列表失败: " + listErr.message);
+      if (!fileList || fileList.length === 0) break;
+
+      // 【关键修复】：必须有 f.id 才是真实文件（没有 id 的是虚拟文件夹），且排除占位符
+      const validFiles = fileList.filter(f => f.name && f.id && f.name !== ".emptyFolderPlaceholder");
+      allStorageFiles.push(...validFiles.map(f => f.name));
+
+      if (fileList.length < limit) break;
+      offset += limit;
+    }
+
+    // 去重
+    allStorageFiles = [...new Set(allStorageFiles)];
+
+    r2Logs.value.unshift(`📦 存储桶内共发现 ${allStorageFiles.length} 个文件，数据库当前仍在使用 ${usedSupabaseFiles.size} 个 Supabase 文件。`);
+
+    // 4. 筛选出已经迁移走的孤儿源文件
+    const orphans = allStorageFiles.filter(name => !usedSupabaseFiles.has(name));
+
+    if (orphans.length === 0) {
+      r2Logs.value.unshift(`✅ 没有发现残留的源文件，你的 Supabase 存储桶已经清空！`);
+      alert("🎉 存储桶已经全部清理干净了！");
+      return;
+    }
+
+    if (!confirm(`扫描完成！\n在 Supabase 存储桶中发现 ${orphans.length} 个残留源文件。\n\n是否立即永久删除这 ${orphans.length} 个文件？`)) {
+      r2Logs.value.unshift(`🚫 已取消清理操作。`);
+      return;
+    }
+
+    // 5. 分批删除（每次 50 个，防止 URL 过长或超时）
+    let deletedCount = 0;
+    const batchSize = 50;
+    for (let i = 0; i < orphans.length; i += batchSize) {
+      const batch = orphans.slice(i, i + batchSize);
+      r2Logs.value.unshift(`🗑️ 正在删除第 ${i + 1} ~ ${Math.min(i + batchSize, orphans.length)} 个残留文件...`);
+      
+      const { data: delData, error: delErr } = await supabase.storage.from("uploads").remove(batch);
+      if (delErr) {
+        throw new Error(`删除报错: ${delErr.message}`);
+      }
+      
+      const count = delData ? delData.length : 0;
+      deletedCount += count;
+
+      // 如果第一批就返回 0，说明被 Supabase 后台 RLS 权限静默拦截了，直接中断提醒！
+      if (i === 0 && count === 0) {
+        r2Logs.value.unshift(`⚠️ 警告：Supabase 静默拒绝了删除请求（返回 0 个）！这是因为旧文件的 owner 权限不匹配，请先在 Supabase 后台 SQL Editor 运行放行策略！`);
+        alert("⚠️ 删除被 Supabase 权限拦截（删除了 0 个）！\n\n请先去 Supabase 后台 -> SQL Editor 运行我发给你的那句 CREATE POLICY 命令，再来点击即可全部删光！");
+        return;
+      }
+    }
+
+    r2Logs.value.unshift(`🎉 清理完成！本次成功从 Supabase 彻底删除了 ${deletedCount} 个残留源文件！`);
+    alert(`🎉 成功删除了 ${deletedCount} 个 Supabase 残留源文件！`);
+  } catch (e) {
+    console.error(e);
+    r2Logs.value.unshift(`🚨 清理出错: ${e.message}`);
+    alert("清理失败: " + e.message);
+  } finally {
+    isCleaningOrphans.value = false;
+  }
+};
+
 
 
           // ... 修改 fetchData 函数，在获取数据后调用上面这个函数 ...
@@ -6824,16 +6940,24 @@ else if (type === "beautify") {
 
               if (editingId.value) {
                 // ====== 编辑模式 (UPDATE) ======
+                // 【关键修复】：编辑时绝对不要覆盖 user_id，防止旧数据/迁移数据的 user_id 不一致被 RLS 静默拦截！
+                const updatePayload = { ...payload };
+                delete updatePayload.user_id;
+
                 const { data, error } = await supabase
                   .from("fragments")
-                  .update(payload)
+                  .update(updatePayload)
                   .eq("id", editingId.value)
                   .select();
 
                 if (error) throw error;
-                if (!data || data.length === 0)
-                  throw new Error("更新失败，记录可能不存在");
+                if (!data || data.length === 0) {
+                  throw new Error(
+                    "更新被数据库拒绝（返回0条）。请检查 Supabase 的 fragments 表是否开启了 UPDATE 的 RLS 权限策略！"
+                  );
+                }
               } else {
+
                 // ====== 新增模式 (INSERT) ======
 
                 // 【关键修复点】：在这里加上 role_card 和 font
@@ -7334,6 +7458,8 @@ r2Progress,
 r2Options,
 openR2Migration,
 startR2Migration,
+cleanOrphanedSupabaseFiles, // <--- 新增这行
+isCleaningOrphans,          // <--- 新增这行
 r2SelectAll,
 r2SelectByType,
 r2SelectImagesOnly,
